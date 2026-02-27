@@ -96,3 +96,33 @@ export const validateRegulatoryPredictions = [
   body('regulationIds').isArray({ min: 1 }).withMessage('regulationIds must be a non-empty array'),
   handleValidationErrors,
 ];
+
+// ── Drift Analysis Validation ─────────────────────────────────────
+
+export const validateDriftAnalysis = [
+  body('agentId').notEmpty().withMessage('agentId is required'),
+  body('metrics').isObject().withMessage('metrics must be an object'),
+  handleValidationErrors,
+];
+
+// ── Deployment Optimisation Validation ─────────────────────────────
+
+export const validateOptimizeDeployment = [
+  body('constraints').isObject().withMessage('constraints must be an object'),
+  handleValidationErrors,
+];
+
+// ── Market Signals Validation ──────────────────────────────────────
+
+export const validateMarketSignals = [
+  body('industry').notEmpty().withMessage('industry is required'),
+  body('history').isArray().withMessage('history must be an array'),
+  handleValidationErrors,
+];
+
+// ── Classify Regulations Validation ────────────────────────────────
+
+export const validateClassifyRegulations = [
+  body('regulations').isArray({ min: 1 }).withMessage('regulations must be a non-empty array'),
+  handleValidationErrors,
+];

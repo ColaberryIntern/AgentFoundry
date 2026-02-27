@@ -19,6 +19,14 @@ const httpRequestDuration = new Histogram({
   registers: [register],
 });
 
+// Compliance-specific custom metrics
+export const complianceChecksTotal = new Counter({
+  name: 'compliance_checks_total',
+  help: 'Total compliance checks performed',
+  labelNames: ['status'],
+  registers: [register],
+});
+
 export const metricsMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const start = Date.now();
   res.on('finish', () => {

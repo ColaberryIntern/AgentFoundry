@@ -1,7 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import morgan from 'morgan';
 import dotenv from 'dotenv';
 import healthRouter from './routes/health';
 import recommendationsRouter from './routes/recommendations';
@@ -12,6 +11,7 @@ import adaptiveRouter from './routes/adaptive';
 import { errorHandler } from './middleware/errorHandler';
 import { initModels } from './models';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
+import logger from './utils/logger';
 
 dotenv.config();
 
@@ -26,9 +26,22 @@ app.use(express.json());
 app.get('/metrics', metricsEndpoint);
 app.use(metricsMiddleware);
 
-// Disable request logging during tests to keep output clean
+// HTTP request logging via Winston (disabled during tests)
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('combined'));
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      logger.info('HTTP request', {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        duration: `${duration}ms`,
+        correlationId: req.headers['x-correlation-id'] || undefined,
+      });
+    });
+    next();
+  });
 }
 
 app.use('/health', healthRouter);

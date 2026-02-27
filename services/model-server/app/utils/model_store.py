@@ -16,7 +16,11 @@ import joblib
 
 if TYPE_CHECKING:
     from app.models.compliance_gap import ComplianceGapModel
+    from app.models.deployment_optimizer import DeploymentOptimizer
+    from app.models.drift_detector import DriftDetector
+    from app.models.market_signals import MarketSignalPredictor
     from app.models.regulatory_predictor import RegulatoryPredictor
+    from app.models.taxonomy_classifier import TaxonomyClassifier
 
 
 class ModelStore:
@@ -107,6 +111,22 @@ class ModelStore:
             from app.models.regulatory_predictor import RegulatoryPredictor
 
             model = RegulatoryPredictor()
+        elif model_class_name == "DriftDetector":
+            from app.models.drift_detector import DriftDetector
+
+            model = DriftDetector()
+        elif model_class_name == "DeploymentOptimizer":
+            from app.models.deployment_optimizer import DeploymentOptimizer
+
+            model = DeploymentOptimizer()
+        elif model_class_name == "MarketSignalPredictor":
+            from app.models.market_signals import MarketSignalPredictor
+
+            model = MarketSignalPredictor()
+        elif model_class_name == "TaxonomyClassifier":
+            from app.models.taxonomy_classifier import TaxonomyClassifier
+
+            model = TaxonomyClassifier()
         else:
             return None
 

@@ -4,8 +4,6 @@ dotenv.config();
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
-import morgan from 'morgan';
-
 import { sequelize } from './config/database';
 import './models/ComplianceRecord';
 import healthRouter from './routes/health';
@@ -14,6 +12,7 @@ import dashboardRouter from './routes/dashboard';
 import regulationsRouter from './routes/regulations';
 import { errorHandler } from './middleware/errorHandler';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
+import logger from './utils/logger';
 
 const app = express();
 const PORT = parseInt(process.env.COMPLIANCE_SERVICE_PORT || '3002', 10);
@@ -27,9 +26,22 @@ app.use(express.json());
 app.get('/metrics', metricsEndpoint);
 app.use(metricsMiddleware);
 
-// Disable request logging in test environment to keep test output clean
+// HTTP request logging via Winston (disabled during tests)
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('combined'));
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      logger.info('HTTP request', {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        duration: `${duration}ms`,
+        correlationId: req.headers['x-correlation-id'] || undefined,
+      });
+    });
+    next();
+  });
 }
 
 // --------------- Routes ---------------
@@ -45,6 +57,7 @@ app.use(errorHandler);
 if (require.main === module) {
   sequelize.sync().then(() => {
     app.listen(PORT, () => {
+      // eslint-disable-next-line no-console
       console.log(`Compliance Monitor Service listening on port ${PORT}`);
     });
   });

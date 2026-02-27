@@ -11,4 +11,22 @@ describe('GET /health', () => {
     expect(response.body).toHaveProperty('timestamp');
     expect(new Date(response.body.timestamp).toISOString()).toBe(response.body.timestamp);
   });
+
+  it('includes version and uptime', async () => {
+    const response = await request(app).get('/health');
+
+    expect(response.body).toHaveProperty('version', '0.1.0');
+    expect(response.body).toHaveProperty('uptime');
+    expect(typeof response.body.uptime).toBe('number');
+    expect(response.body.uptime).toBeGreaterThanOrEqual(0);
+  });
+
+  it('includes memory checks', async () => {
+    const response = await request(app).get('/health');
+
+    expect(response.body).toHaveProperty('checks');
+    expect(response.body.checks).toHaveProperty('memory');
+    expect(response.body.checks.memory).toHaveProperty('used');
+    expect(response.body.checks.memory).toHaveProperty('total');
+  });
 });

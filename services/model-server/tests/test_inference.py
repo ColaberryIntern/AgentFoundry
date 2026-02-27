@@ -4,6 +4,10 @@ Tests for the inference endpoints.
 Validates that:
 - POST /predict/compliance-gaps with valid data returns 200 + recommendations
 - POST /predict/regulatory-changes with valid data returns 200 + predictions
+- POST /predict/drift-analysis with valid data returns 200 + drift result
+- POST /predict/optimize-deployment with valid data returns 200 + config
+- POST /predict/market-signals with valid data returns 200 + predictions
+- POST /predict/classify-regulations with valid data returns 200 + clusters
 - Missing required fields return 422
 - Rule-based fallback works when no trained model is loaded
 """
@@ -203,3 +207,249 @@ async def test_predict_regulatory_changes_empty_ids():
     assert response.status_code == 200
     body = response.json()
     assert body["predictions"] == []
+
+
+# ----------------------------------------------------------------
+# Drift analysis
+# ----------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_predict_drift_analysis_valid_data():
+    """POST /predict/drift-analysis with valid payload returns 200."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/drift-analysis",
+            json={
+                "agent_id": "agent-001",
+                "metrics": {
+                    "compliance_score": 0.85,
+                    "response_time": 200.0,
+                    "error_rate": 0.02,
+                    "throughput": 100.0,
+                    "latency_p99": 500.0,
+                },
+            },
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert "agent_id" in body
+    assert body["agent_id"] == "agent-001"
+    assert "is_drifting" in body
+    assert "anomaly_score" in body
+    assert "threshold" in body
+    assert "details" in body
+    assert "model_version" in body
+    assert "inference_time_ms" in body
+
+
+@pytest.mark.anyio
+async def test_predict_drift_analysis_missing_fields():
+    """Missing required fields should return 422."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/drift-analysis",
+            json={"metrics": {}},
+        )
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_predict_drift_analysis_detects_anomaly():
+    """Highly deviant metrics should flag drift."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/drift-analysis",
+            json={
+                "agent_id": "agent-drift",
+                "metrics": {
+                    "compliance_score": 0.01,
+                    "response_time": 9999.0,
+                    "error_rate": 0.99,
+                    "throughput": 0.1,
+                    "latency_p99": 50000.0,
+                },
+            },
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_drifting"] is True
+
+
+# ----------------------------------------------------------------
+# Deployment optimisation
+# ----------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_predict_optimize_deployment_valid_data():
+    """POST /predict/optimize-deployment with valid payload returns 200."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/optimize-deployment",
+            json={
+                "constraints": {
+                    "max_cpu": 16,
+                    "max_memory": 32768,
+                    "target_latency": 100,
+                    "agent_count": 4,
+                },
+            },
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert "recommended_config" in body
+    assert "fitness_score" in body
+    assert "generations" in body
+    assert "alternatives" in body
+    assert "inference_time_ms" in body
+
+
+@pytest.mark.anyio
+async def test_predict_optimize_deployment_missing_fields():
+    """Missing required fields should return 422."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/optimize-deployment",
+            json={},
+        )
+    assert response.status_code == 422
+
+
+# ----------------------------------------------------------------
+# Market signals
+# ----------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_predict_market_signals_valid_data():
+    """POST /predict/market-signals with valid payload returns 200."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/market-signals",
+            json={
+                "industry": "fintech",
+                "history": [
+                    {"period": "2025-Q1", "activity_count": 10},
+                    {"period": "2025-Q2", "activity_count": 15},
+                    {"period": "2025-Q3", "activity_count": 20},
+                ],
+            },
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert "predictions" in body
+    assert "industry" in body
+    assert body["industry"] == "fintech"
+    assert "model_type" in body
+    assert "inference_time_ms" in body
+
+
+@pytest.mark.anyio
+async def test_predict_market_signals_empty_history():
+    """Empty history should return 200 with empty predictions."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/market-signals",
+            json={
+                "industry": "healthcare",
+                "history": [],
+            },
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["predictions"] == []
+
+
+@pytest.mark.anyio
+async def test_predict_market_signals_missing_fields():
+    """Missing required fields should return 422."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/market-signals",
+            json={"history": []},
+        )
+    assert response.status_code == 422
+
+
+# ----------------------------------------------------------------
+# Regulation taxonomy classification
+# ----------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_predict_classify_regulations_valid_data():
+    """POST /predict/classify-regulations with valid payload returns 200."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/classify-regulations",
+            json={
+                "regulations": [
+                    {
+                        "id": "reg-1",
+                        "title": "GDPR Data Protection",
+                        "description": "EU data privacy regulation.",
+                    },
+                    {
+                        "id": "reg-2",
+                        "title": "SOX Financial Reporting",
+                        "description": "Financial auditing requirements.",
+                    },
+                    {
+                        "id": "reg-3",
+                        "title": "HIPAA Health Data",
+                        "description": "Health information privacy and security.",
+                    },
+                ],
+            },
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert "clusters" in body
+    assert "total_clusters" in body
+    assert "method" in body
+    assert "inference_time_ms" in body
+    assert body["total_clusters"] >= 1
+
+
+@pytest.mark.anyio
+async def test_predict_classify_regulations_missing_fields():
+    """Missing required fields should return 422."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/classify-regulations",
+            json={},
+        )
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_predict_classify_regulations_single():
+    """Single regulation should fall back to keyword classification."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/predict/classify-regulations",
+            json={
+                "regulations": [
+                    {
+                        "id": "reg-solo",
+                        "title": "GDPR Privacy",
+                        "description": "Data protection regulation.",
+                    },
+                ],
+            },
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["method"] == "keyword_fallback"

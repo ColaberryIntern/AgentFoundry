@@ -109,6 +109,171 @@ describe('Inference API', () => {
   });
 
   // ====================================================================
+  // POST /api/inference/drift-analysis
+  // ====================================================================
+
+  describe('POST /api/inference/drift-analysis', () => {
+    it('should return 503 when model server is unavailable', async () => {
+      const res = await request(app)
+        .post('/api/inference/drift-analysis')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          agentId: 'agent-001',
+          metrics: {
+            compliance_score: 0.85,
+            response_time: 200.0,
+            error_rate: 0.02,
+          },
+        });
+
+      expect(res.status).toBe(503);
+      expect(res.body.error).toHaveProperty('message');
+    });
+
+    it('should return 401 without auth', async () => {
+      const res = await request(app).post('/api/inference/drift-analysis').send({
+        agentId: 'agent-001',
+        metrics: {},
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
+    });
+
+    it('should return 400 for missing required fields', async () => {
+      const res = await request(app)
+        .post('/api/inference/drift-analysis')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ====================================================================
+  // POST /api/inference/optimize-deployment
+  // ====================================================================
+
+  describe('POST /api/inference/optimize-deployment', () => {
+    it('should return 503 when model server is unavailable', async () => {
+      const res = await request(app)
+        .post('/api/inference/optimize-deployment')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          constraints: {
+            max_cpu: 16,
+            max_memory: 32768,
+            target_latency: 100,
+            agent_count: 4,
+          },
+        });
+
+      expect(res.status).toBe(503);
+      expect(res.body.error).toHaveProperty('message');
+    });
+
+    it('should return 401 without auth', async () => {
+      const res = await request(app).post('/api/inference/optimize-deployment').send({
+        constraints: {},
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
+    });
+
+    it('should return 400 for missing required fields', async () => {
+      const res = await request(app)
+        .post('/api/inference/optimize-deployment')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ====================================================================
+  // POST /api/inference/market-signals
+  // ====================================================================
+
+  describe('POST /api/inference/market-signals', () => {
+    it('should return 503 when model server is unavailable', async () => {
+      const res = await request(app)
+        .post('/api/inference/market-signals')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          industry: 'fintech',
+          history: [
+            { period: '2025-Q1', activity_count: 10 },
+            { period: '2025-Q2', activity_count: 15 },
+          ],
+        });
+
+      expect(res.status).toBe(503);
+      expect(res.body.error).toHaveProperty('message');
+    });
+
+    it('should return 401 without auth', async () => {
+      const res = await request(app).post('/api/inference/market-signals').send({
+        industry: 'fintech',
+        history: [],
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
+    });
+
+    it('should return 400 for missing required fields', async () => {
+      const res = await request(app)
+        .post('/api/inference/market-signals')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ====================================================================
+  // POST /api/inference/classify-regulations
+  // ====================================================================
+
+  describe('POST /api/inference/classify-regulations', () => {
+    it('should return 503 when model server is unavailable', async () => {
+      const res = await request(app)
+        .post('/api/inference/classify-regulations')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          regulations: [
+            { id: 'reg-1', title: 'GDPR', description: 'Data protection regulation.' },
+            { id: 'reg-2', title: 'SOX', description: 'Financial auditing requirements.' },
+          ],
+        });
+
+      expect(res.status).toBe(503);
+      expect(res.body.error).toHaveProperty('message');
+    });
+
+    it('should return 401 without auth', async () => {
+      const res = await request(app)
+        .post('/api/inference/classify-regulations')
+        .send({
+          regulations: [{ id: 'reg-1', title: 'Test', description: 'Test.' }],
+        });
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
+    });
+
+    it('should return 400 for missing required fields', async () => {
+      const res = await request(app)
+        .post('/api/inference/classify-regulations')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+  });
+
+  // ====================================================================
   // GET /api/inference/health
   // ====================================================================
 

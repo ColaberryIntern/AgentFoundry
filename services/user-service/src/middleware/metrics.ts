@@ -19,6 +19,19 @@ const httpRequestDuration = new Histogram({
   registers: [register],
 });
 
+// User-specific custom metrics
+export const userRegistrationsTotal = new Counter({
+  name: 'user_registrations_total',
+  help: 'Total user registrations',
+  registers: [register],
+});
+
+export const userLoginsTotal = new Counter({
+  name: 'user_logins_total',
+  help: 'Total user logins',
+  registers: [register],
+});
+
 export const metricsMiddleware = (req: Request, res: Response, next: NextFunction): void => {
   const start = Date.now();
   res.on('finish', () => {

@@ -18,4 +18,22 @@ describe('GET /health', () => {
 
     expect(res.headers['content-type']).toMatch(/application\/json/);
   });
+
+  it('includes version and uptime', async () => {
+    const res = await request(app).get('/health');
+
+    expect(res.body).toHaveProperty('version', '0.1.0');
+    expect(res.body).toHaveProperty('uptime');
+    expect(typeof res.body.uptime).toBe('number');
+    expect(res.body.uptime).toBeGreaterThanOrEqual(0);
+  });
+
+  it('includes memory checks', async () => {
+    const res = await request(app).get('/health');
+
+    expect(res.body).toHaveProperty('checks');
+    expect(res.body.checks).toHaveProperty('memory');
+    expect(res.body.checks.memory).toHaveProperty('used');
+    expect(res.body.checks.memory).toHaveProperty('total');
+  });
 });

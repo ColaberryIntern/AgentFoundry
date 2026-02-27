@@ -1,20 +1,119 @@
-import rateLimit from 'express-rate-limit';
+import { Request, Response, NextFunction } from 'express';
+import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit';
+
+// ---------------------------------------------------------------------------
+// Tier definitions
+// ---------------------------------------------------------------------------
+export interface RateLimitTier {
+  name: string;
+  maxRequests: number;
+  windowMs: number;
+}
+
+export const RATE_LIMIT_TIERS: Record<string, RateLimitTier> = {
+  free: { name: 'free', maxRequests: 60, windowMs: 60_000 },
+  standard: { name: 'standard', maxRequests: 300, windowMs: 60_000 },
+  enterprise: { name: 'enterprise', maxRequests: 1000, windowMs: 60_000 },
+};
+
+// ---------------------------------------------------------------------------
+// Build a rate limiter instance for a given tier.
+// ---------------------------------------------------------------------------
+function buildLimiter(tier: RateLimitTier): RateLimitRequestHandler {
+  return rateLimit({
+    windowMs: tier.windowMs,
+    max: tier.maxRequests,
+    standardHeaders: false,
+    legacyHeaders: false,
+    keyGenerator: (req: Request) => {
+      // Use user ID for authenticated requests, IP for anonymous
+      return (req as Request & { user?: { userId?: string } }).user?.userId ?? req.ip ?? 'unknown';
+    },
+    handler: (_req: Request, res: Response) => {
+      res.status(429).json({
+        error: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: `Rate limit exceeded for ${tier.name} tier. Maximum ${tier.maxRequests} requests per minute.`,
+          details: null,
+        },
+      });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Pre-initialize all tier limiters at module load time
+// (express-rate-limit v7 requires creation outside request handlers)
+// ---------------------------------------------------------------------------
+let tierLimiters: Record<string, RateLimitRequestHandler> = {
+  free: buildLimiter(RATE_LIMIT_TIERS.free),
+  standard: buildLimiter(RATE_LIMIT_TIERS.standard),
+  enterprise: buildLimiter(RATE_LIMIT_TIERS.enterprise),
+};
 
 /**
- * Default rate limiter — 100 requests per 1-minute window per IP.
+ * Resolve the rate-limit tier for an incoming request.
  *
- * Returns HTTP 429 with a clear JSON message when the limit is exceeded.
+ * Priority:
+ * 1. User role `it_admin` -> enterprise
+ * 2. Authenticated user -> standard
+ * 3. Unauthenticated -> free
  */
-export const rateLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 100,
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  message: {
-    error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many requests from this IP. Please try again after 1 minute.',
-      details: null,
-    },
-  },
-});
+function resolveTier(req: Request): string {
+  const user = (req as Request & { user?: { userId?: string; role?: string } }).user;
+  if (!user) return 'free';
+  if (user.role === 'it_admin') return 'enterprise';
+  return 'standard';
+}
+
+/**
+ * Tier-based rate limiter middleware.
+ *
+ * Resolves the caller's tier, applies the matching rate limiter, and sets
+ * standardised rate-limit response headers:
+ *   - X-RateLimit-Limit
+ *   - X-RateLimit-Remaining
+ *   - X-RateLimit-Reset
+ */
+export function rateLimiter(req: Request, res: Response, next: NextFunction): void {
+  const tierName = resolveTier(req);
+  const tier = RATE_LIMIT_TIERS[tierName] ?? RATE_LIMIT_TIERS.free;
+  const limiter = tierLimiters[tierName] ?? tierLimiters.free;
+
+  // Attach custom headers after the limiter processes the request.
+  const originalEnd = res.end;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res.end = function patchedEnd(...args: any[]) {
+    if (!res.getHeader('X-RateLimit-Limit')) {
+      res.setHeader('X-RateLimit-Limit', tier.maxRequests.toString());
+    }
+    const remaining = res.getHeader('RateLimit-Remaining');
+    if (!res.getHeader('X-RateLimit-Remaining') && remaining !== undefined) {
+      res.setHeader('X-RateLimit-Remaining', remaining.toString());
+    }
+    const reset = res.getHeader('RateLimit-Reset');
+    if (!res.getHeader('X-RateLimit-Reset') && reset !== undefined) {
+      res.setHeader('X-RateLimit-Reset', reset.toString());
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (originalEnd as (...a: any[]) => any).apply(res, args);
+  } as typeof res.end;
+
+  // Set the limit header early so it is present even if the limiter short-circuits
+  res.setHeader('X-RateLimit-Limit', tier.maxRequests.toString());
+
+  limiter(req, res, next);
+}
+
+/**
+ * Reset the in-memory limiter stores — useful for tests.
+ * Rebuilds all tier limiters with fresh counters.
+ */
+export function resetRateLimiters(): void {
+  tierLimiters = {
+    free: buildLimiter(RATE_LIMIT_TIERS.free),
+    standard: buildLimiter(RATE_LIMIT_TIERS.standard),
+    enterprise: buildLimiter(RATE_LIMIT_TIERS.enterprise),
+  };
+}

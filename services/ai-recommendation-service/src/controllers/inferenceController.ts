@@ -160,6 +160,204 @@ export async function regulatoryPredictions(
 }
 
 /**
+ * POST /api/inference/drift-analysis
+ *
+ * Run drift analysis by calling the Python model server.
+ *
+ * Returns 503 gracefully if the model server is unavailable.
+ */
+export async function driftAnalysis(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { agentId, metrics } = req.body;
+
+    const start = Date.now();
+    let response;
+    try {
+      response = await axios.post(`${MODEL_SERVER_URL}/predict/drift-analysis`, {
+        agent_id: agentId,
+        metrics,
+      });
+    } catch {
+      res.status(503).json({
+        error: {
+          code: 'MODEL_SERVER_UNAVAILABLE',
+          message: 'AI model server is currently offline. Please try again later.',
+        },
+      });
+      return;
+    }
+
+    const duration = (Date.now() - start) / 1000;
+    aiInferenceDuration.observe(
+      { model_name: 'drift-detector', model_version: 'latest', endpoint: 'drift-analysis' },
+      duration,
+    );
+
+    res.status(200).json({
+      ...response.data,
+      inferenceTime: duration,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/inference/optimize-deployment
+ *
+ * Run deployment optimisation by calling the Python model server.
+ *
+ * Returns 503 gracefully if the model server is unavailable.
+ */
+export async function optimizeDeployment(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { constraints } = req.body;
+
+    const start = Date.now();
+    let response;
+    try {
+      response = await axios.post(`${MODEL_SERVER_URL}/predict/optimize-deployment`, {
+        constraints,
+      });
+    } catch {
+      res.status(503).json({
+        error: {
+          code: 'MODEL_SERVER_UNAVAILABLE',
+          message: 'AI model server is currently offline. Please try again later.',
+        },
+      });
+      return;
+    }
+
+    const duration = (Date.now() - start) / 1000;
+    aiInferenceDuration.observe(
+      {
+        model_name: 'deployment-optimizer',
+        model_version: 'latest',
+        endpoint: 'optimize-deployment',
+      },
+      duration,
+    );
+
+    res.status(200).json({
+      ...response.data,
+      inferenceTime: duration,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/inference/market-signals
+ *
+ * Run market signal predictions by calling the Python model server.
+ *
+ * Returns 503 gracefully if the model server is unavailable.
+ */
+export async function marketSignals(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { industry, history } = req.body;
+
+    const start = Date.now();
+    let response;
+    try {
+      response = await axios.post(`${MODEL_SERVER_URL}/predict/market-signals`, {
+        industry,
+        history,
+      });
+    } catch {
+      res.status(503).json({
+        error: {
+          code: 'MODEL_SERVER_UNAVAILABLE',
+          message: 'AI model server is currently offline. Please try again later.',
+        },
+      });
+      return;
+    }
+
+    const duration = (Date.now() - start) / 1000;
+    aiInferenceDuration.observe(
+      {
+        model_name: 'market-signal-predictor',
+        model_version: 'latest',
+        endpoint: 'market-signals',
+      },
+      duration,
+    );
+
+    res.status(200).json({
+      ...response.data,
+      inferenceTime: duration,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/inference/classify-regulations
+ *
+ * Run regulation taxonomy classification by calling the Python model server.
+ *
+ * Returns 503 gracefully if the model server is unavailable.
+ */
+export async function classifyRegulations(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { regulations } = req.body;
+
+    const start = Date.now();
+    let response;
+    try {
+      response = await axios.post(`${MODEL_SERVER_URL}/predict/classify-regulations`, {
+        regulations,
+      });
+    } catch {
+      res.status(503).json({
+        error: {
+          code: 'MODEL_SERVER_UNAVAILABLE',
+          message: 'AI model server is currently offline. Please try again later.',
+        },
+      });
+      return;
+    }
+
+    const duration = (Date.now() - start) / 1000;
+    aiInferenceDuration.observe(
+      {
+        model_name: 'taxonomy-classifier',
+        model_version: 'latest',
+        endpoint: 'classify-regulations',
+      },
+      duration,
+    );
+
+    res.status(200).json({
+      ...response.data,
+      inferenceTime: duration,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
  * GET /api/inference/health
  *
  * Check model server health.

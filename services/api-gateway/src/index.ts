@@ -5,8 +5,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import morgan from 'morgan';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import swaggerUi from 'swagger-ui-express';
 
 import healthRouter from './routes/health';
 import searchRouter from './routes/search';
@@ -15,6 +15,10 @@ import feedbackRouter from './routes/feedback';
 import { rateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
+import { apiVersionMiddleware, createVersionRouter } from './middleware/apiVersion';
+import { correlationIdMiddleware } from './middleware/correlationId';
+import logger from './utils/logger';
+import { openApiSpec } from './docs/openapi';
 import { initModels } from './models';
 
 const app = express();
@@ -27,14 +31,14 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:'],
       },
     },
-    crossOriginEmbedderPolicy: true,
+    crossOriginEmbedderPolicy: false,
     crossOriginOpenerPolicy: true,
-    crossOriginResourcePolicy: { policy: 'same-site' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }),
 );
@@ -43,11 +47,33 @@ app.use(
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-API-Version'],
   }),
 );
 app.use(express.json());
 app.use(compression());
+
+// ---------------------------------------------------------------------------
+// API Documentation — Swagger UI (BEFORE proxy routes so it is not proxied)
+// ---------------------------------------------------------------------------
+app.use(
+  '/api/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(openApiSpec, {
+    customSiteTitle: 'Agent Foundry API',
+  }),
+);
+app.get('/api/docs.json', (_req, res) => res.json(openApiSpec));
+
+// ---------------------------------------------------------------------------
+// Correlation ID — generate or propagate request correlation IDs
+// ---------------------------------------------------------------------------
+app.use(correlationIdMiddleware);
+
+// ---------------------------------------------------------------------------
+// API versioning — resolve version from header or URL
+// ---------------------------------------------------------------------------
+app.use(apiVersionMiddleware);
 
 // Metrics endpoint — before rate limiter so it is not rate-limited
 app.get('/metrics', metricsEndpoint);
@@ -55,9 +81,22 @@ app.get('/metrics', metricsEndpoint);
 app.use(rateLimiter);
 app.use(metricsMiddleware);
 
-// Disable HTTP logging noise during tests.
+// HTTP request logging via Winston (disabled during tests)
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('combined'));
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      logger.info('HTTP request', {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        duration: `${duration}ms`,
+        correlationId: req.headers['x-correlation-id'] || undefined,
+      });
+    });
+    next();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +254,11 @@ app.use(
     pathRewrite: { '^/api/adaptive': '/api/adaptive' },
   }),
 );
+
+// ---------------------------------------------------------------------------
+// API version prefix routing: /api/v1/* → /api/*
+// ---------------------------------------------------------------------------
+app.use('/api/v1', createVersionRouter(app));
 
 // ---------------------------------------------------------------------------
 // Error handling — must be last

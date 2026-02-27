@@ -2,7 +2,6 @@ import express from 'express';
 import http from 'http';
 import helmet from 'helmet';
 import cors from 'cors';
-import morgan from 'morgan';
 import dotenv from 'dotenv';
 import healthRouter from './routes/health';
 import notificationRouter from './routes/notifications';
@@ -14,6 +13,7 @@ import { setupDashboardWebSocket } from './ws/dashboardWs';
 import dashboardEventsRouter from './routes/dashboardEvents';
 import { rabbitmqConsumer } from './utils/rabbitmq';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
+import logger from './utils/logger';
 
 dotenv.config();
 
@@ -28,9 +28,22 @@ app.use(express.json());
 app.get('/metrics', metricsEndpoint);
 app.use(metricsMiddleware);
 
-// Disable request logging in test mode
+// HTTP request logging via Winston (disabled during tests)
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('combined'));
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      logger.info('HTTP request', {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        duration: `${duration}ms`,
+        correlationId: req.headers['x-correlation-id'] || undefined,
+      });
+    });
+    next();
+  });
 }
 
 app.use('/health', healthRouter);
@@ -62,17 +75,20 @@ if (require.main === module) {
   initModels()
     .then(() => {
       server.listen(PORT, () => {
+        // eslint-disable-next-line no-console
         console.log(`Notification Service listening on port ${PORT}`);
       });
 
       // Start RabbitMQ consumer (not in test mode)
       if (process.env.NODE_ENV !== 'test') {
         rabbitmqConsumer.connect().catch((err) => {
+          // eslint-disable-next-line no-console
           console.warn('[notification-service] RabbitMQ consumer startup warning:', err);
         });
       }
     })
     .catch((err) => {
+      // eslint-disable-next-line no-console
       console.error('[notification-service] Failed to initialize models:', err);
       process.exit(1);
     });

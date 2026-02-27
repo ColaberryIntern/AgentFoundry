@@ -4,8 +4,6 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
-
 import { sequelize } from './config/database';
 import './models'; // Register all models and associations
 import healthRouter from './routes/health';
@@ -17,6 +15,7 @@ import apiKeysRouter from './routes/apiKeys';
 import { authenticate } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
+import logger from './utils/logger';
 
 const app = express();
 
@@ -29,9 +28,22 @@ app.use(express.json());
 app.get('/metrics', metricsEndpoint);
 app.use(metricsMiddleware);
 
-// Disable request logging in test environment to keep test output clean
+// HTTP request logging via Winston (disabled during tests)
 if (process.env.NODE_ENV !== 'test') {
-  app.use(morgan('combined'));
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - start;
+      logger.info('HTTP request', {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        duration: `${duration}ms`,
+        correlationId: req.headers['x-correlation-id'] || undefined,
+      });
+    });
+    next();
+  });
 }
 
 // --------------- Routes ---------------
@@ -51,6 +63,7 @@ const PORT = parseInt(process.env.USER_SERVICE_PORT ?? '3001', 10);
 if (require.main === module) {
   sequelize.sync().then(() => {
     app.listen(PORT, () => {
+      // eslint-disable-next-line no-console
       console.log(`[user-service] listening on port ${PORT}`);
     });
   });
