@@ -10,10 +10,20 @@ export interface OnboardingProgress {
   completedAt: string | null;
 }
 
+// Backend wraps the progress object: { progress: OnboardingProgress }
+interface OnboardingResponse {
+  progress: OnboardingProgress;
+}
+
 export const onboardingApi = {
-  getProgress: () => api.get<OnboardingProgress>('/users/onboarding'),
+  getProgress: () =>
+    api.get<OnboardingResponse>('/users/onboarding').then((res) => res.data.progress),
   advanceStep: (step: number) =>
-    api.post<OnboardingProgress>('/users/onboarding/advance', { step }),
-  skip: () => api.post<OnboardingProgress>('/users/onboarding/skip'),
-  reset: () => api.post<OnboardingProgress>('/users/onboarding/reset'),
+    api
+      .post<OnboardingResponse>('/users/onboarding/advance', { step })
+      .then((res) => res.data.progress),
+  skip: () =>
+    api.post<OnboardingResponse>('/users/onboarding/skip').then((res) => res.data.progress),
+  reset: () =>
+    api.post<OnboardingResponse>('/users/onboarding/reset').then((res) => res.data.progress),
 };

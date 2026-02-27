@@ -22,8 +22,7 @@ export const fetchOnboarding = createAsyncThunk(
   'onboarding/fetchOnboarding',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await onboardingApi.getProgress();
-      return response.data;
+      return await onboardingApi.getProgress();
     } catch (err) {
       const error = err as AxiosError<ApiErrorResponse>;
       return rejectWithValue(
@@ -37,8 +36,7 @@ export const advanceOnboardingStep = createAsyncThunk(
   'onboarding/advanceStep',
   async (step: number, { rejectWithValue }) => {
     try {
-      const response = await onboardingApi.advanceStep(step);
-      return response.data;
+      return await onboardingApi.advanceStep(step);
     } catch (err) {
       const error = err as AxiosError<ApiErrorResponse>;
       return rejectWithValue(
@@ -52,8 +50,7 @@ export const skipOnboarding = createAsyncThunk(
   'onboarding/skip',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await onboardingApi.skip();
-      return response.data;
+      return await onboardingApi.skip();
     } catch (err) {
       const error = err as AxiosError<ApiErrorResponse>;
       return rejectWithValue(error.response?.data?.error?.message || 'Failed to skip onboarding');
@@ -65,8 +62,7 @@ export const resetOnboarding = createAsyncThunk(
   'onboarding/reset',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await onboardingApi.reset();
-      return response.data;
+      return await onboardingApi.reset();
     } catch (err) {
       const error = err as AxiosError<ApiErrorResponse>;
       return rejectWithValue(error.response?.data?.error?.message || 'Failed to reset onboarding');
