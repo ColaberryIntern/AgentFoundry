@@ -9,7 +9,7 @@ router.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',
     service: 'user-service',
-    version: '0.1.0',
+    version: '1.0.0',
     uptime: Math.floor((Date.now() - startTime) / 1000),
     timestamp: new Date().toISOString(),
     checks: {

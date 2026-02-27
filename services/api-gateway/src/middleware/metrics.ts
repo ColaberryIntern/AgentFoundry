@@ -37,3 +37,6 @@ export const metricsEndpoint = async (_req: Request, res: Response): Promise<voi
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());
 };
+
+/** Expose the shared registry so other modules can register custom metrics */
+export { register as metricsRegistry };

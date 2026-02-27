@@ -14,7 +14,8 @@ import analyticsRouter from './routes/analytics';
 import feedbackRouter from './routes/feedback';
 import { rateLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
-import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
+import { metricsMiddleware, metricsEndpoint, metricsRegistry } from './middleware/metrics';
+import { createBusinessMetrics } from './middleware/businessMetrics';
 import { apiVersionMiddleware, createVersionRouter } from './middleware/apiVersion';
 import { correlationIdMiddleware } from './middleware/correlationId';
 import { cacheResponse } from './middleware/cacheResponse';
@@ -101,6 +102,10 @@ app.get('/metrics', metricsEndpoint);
 
 app.use(rateLimiter);
 app.use(metricsMiddleware);
+
+// Sprint 25: Business-level Prometheus metrics (active users, compliance checks, etc.)
+const { middleware: businessMetricsMiddleware } = createBusinessMetrics(metricsRegistry);
+app.use(businessMetricsMiddleware);
 
 // HTTP request logging via Winston (disabled during tests)
 if (process.env.NODE_ENV !== 'test') {
@@ -310,8 +315,22 @@ if (process.env.NODE_ENV !== 'test') {
   initModels()
     .then(() => {
       server = app.listen(PORT, () => {
+        const env = process.env.NODE_ENV || 'development';
+        const host = '0.0.0.0';
         // eslint-disable-next-line no-console
-        console.log(`[api-gateway] listening on port ${PORT}`);
+        console.log(
+          [
+            '',
+            'Agent Foundry v1.0.0',
+            '==========================================',
+            `Environment: ${env}`,
+            `API Gateway:  http://${host}:${PORT}`,
+            `API Docs:     http://${host}:${PORT}/api/docs`,
+            `Metrics:      http://${host}:${PORT}/metrics`,
+            '==========================================',
+            '',
+          ].join('\n'),
+        );
       });
     })
     .catch((err) => {

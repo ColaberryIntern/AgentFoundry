@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import OnboardingFlow from './OnboardingFlow';
 import FeedbackWidget from './FeedbackWidget';
+import NPSSurvey from './NPSSurvey';
 
 function Layout() {
   return (
@@ -26,6 +27,7 @@ function Layout() {
       </footer>
       <OnboardingFlow />
       <FeedbackWidget />
+      <NPSSurvey />
     </div>
   );
 }

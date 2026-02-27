@@ -1,6 +1,6 @@
 {
   "name": "@agent-foundry/api-gateway",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "API Gateway microservice for Agent Foundry — routes, rate-limits, and proxies requests to downstream services",
   "main": "dist/index.js",
   "scripts": {

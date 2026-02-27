@@ -1,6 +1,6 @@
 {
   "name": "@agent-foundry/user-service",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "User Service microservice for Agent Foundry — handles user registration, authentication, and profile management",
   "main": "dist/index.js",
   "scripts": {

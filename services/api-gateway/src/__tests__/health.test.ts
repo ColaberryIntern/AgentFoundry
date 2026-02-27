@@ -27,7 +27,7 @@ describe('GET /health', () => {
   it('includes version and uptime', async () => {
     const res = await request(app).get('/health');
 
-    expect(res.body).toHaveProperty('version', '0.1.0');
+    expect(res.body).toHaveProperty('version', '1.0.0');
     expect(res.body).toHaveProperty('uptime');
     expect(typeof res.body.uptime).toBe('number');
     expect(res.body.uptime).toBeGreaterThanOrEqual(0);

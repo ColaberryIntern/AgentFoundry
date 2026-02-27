@@ -1,0 +1,83 @@
+###############################################################################
+# Prometheus Configuration — Agent Foundry
+# Scrapes all microservices and infrastructure targets.
+###############################################################################
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+# ---------------------------------------------------------------------------
+# Alerting — route alerts to AlertManager
+# ---------------------------------------------------------------------------
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# ---------------------------------------------------------------------------
+# Alert rules files
+# ---------------------------------------------------------------------------
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+# ---------------------------------------------------------------------------
+# Scrape targets
+# ---------------------------------------------------------------------------
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  # API Gateway (Node.js / Express)
+  - job_name: api-gateway
+    static_configs:
+      - targets:
+          - api-gateway:3000
+    metrics_path: /metrics
+
+  # User Service (Node.js / Express)
+  - job_name: user-service
+    static_configs:
+      - targets:
+          - user-service:3001
+    metrics_path: /metrics
+
+  # Compliance Monitor Service (Node.js / Express)
+  - job_name: compliance-monitor-service
+    static_configs:
+      - targets:
+          - compliance-monitor-service:3002
+    metrics_path: /metrics
+
+  # Reporting Service (Node.js / Express)
+  - job_name: reporting-service
+    static_configs:
+      - targets:
+          - reporting-service:3003
+    metrics_path: /metrics
+
+  # AI Recommendation Service (Node.js / Express)
+  - job_name: ai-recommendation-service
+    static_configs:
+      - targets:
+          - ai-recommendation-service:3004
+    metrics_path: /metrics
+
+  # Notification Service (Node.js / Express)
+  - job_name: notification-service
+    static_configs:
+      - targets:
+          - notification-service:3005
+    metrics_path: /metrics
+
+  # Model Server (Python FastAPI)
+  - job_name: model-server
+    static_configs:
+      - targets:
+          - model-server:8000
+    metrics_path: /metrics

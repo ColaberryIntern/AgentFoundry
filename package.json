@@ -1,6 +1,6 @@
 {
   "name": "agent-foundry",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "AI-powered regulatory compliance platform — automated governance for C-suite executives",
   "scripts": {
@@ -25,7 +25,11 @@
     "load-test:auth": "npx artillery run tests/load/scenarios/auth-flow.yml",
     "load-test:compliance": "npx artillery run tests/load/scenarios/compliance-check.yml",
     "load-test:ai": "npx artillery run tests/load/scenarios/ai-inference.yml",
-    "prepare": "husky"
+    "prepare": "husky",
+    "seed": "npx ts-node scripts/seed/index.ts",
+    "daily-report": "npx ts-node services/worker/daily_report.ts",
+    "health-check": "npx ts-node execution/health_check.ts",
+    "test:seed": "cd scripts/seed && npx jest --forceExit"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",
