@@ -23,18 +23,22 @@ export const RATE_LIMIT_TIERS: Record<string, RateLimitTier> = {
 // Uses Redis store when available, falls back to the default in-memory store.
 // ---------------------------------------------------------------------------
 function buildLimiter(tier: RateLimitTier): RateLimitRequestHandler {
-  const redis = getRedisClient();
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const storeOption: any = {};
 
-  if (redis && process.env.NODE_ENV !== 'test') {
-    storeOption.store = new RedisStore({
-      // Use `sendCommand` adapter expected by rate-limit-redis
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      sendCommand: ((...args: string[]) => redis.call(args[0], ...args.slice(1))) as any,
-      prefix: `rl:${tier.name}:`,
-    });
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      const redis = getRedisClient();
+      if (redis && redis.status === 'ready') {
+        storeOption.store = new RedisStore({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          sendCommand: ((...args: string[]) => redis.call(args[0], ...args.slice(1))) as any,
+          prefix: `rl:${tier.name}:`,
+        });
+      }
+    } catch {
+      // Redis not available — fall back to in-memory store
+    }
   }
 
   return rateLimit({
