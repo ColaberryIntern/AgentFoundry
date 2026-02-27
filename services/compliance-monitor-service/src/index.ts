@@ -11,6 +11,7 @@ import './models/ComplianceRecord';
 import healthRouter from './routes/health';
 import complianceRouter from './routes/compliance';
 import dashboardRouter from './routes/dashboard';
+import regulationsRouter from './routes/regulations';
 import { errorHandler } from './middleware/errorHandler';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
 
@@ -35,6 +36,7 @@ if (process.env.NODE_ENV !== 'test') {
 app.use('/health', healthRouter);
 app.use('/api/compliance', complianceRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/regulations', regulationsRouter);
 
 // --------------- Error Handling ---------------
 app.use(errorHandler);

@@ -6,12 +6,16 @@ import {
   getComplianceSummary,
   getComplianceByUser,
   updateComplianceStatus,
+  analyzeCompliance,
 } from '../controllers/complianceController';
 
 const router = Router();
 
 // POST /api/compliance/monitor — create a new compliance monitor
 router.post('/monitor', authenticate, validateCreateMonitor, createMonitor);
+
+// POST /api/compliance/analyze — AI-powered compliance gap analysis
+router.post('/analyze', authenticate, analyzeCompliance);
 
 // GET /api/compliance/summary — aggregate compliance summary (must be before :userId)
 router.get('/summary', authenticate, getComplianceSummary);

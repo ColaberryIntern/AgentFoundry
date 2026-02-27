@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import 'sequelize';
+import axios from 'axios';
 import ComplianceRecord from '../models/ComplianceRecord';
 import { AppError } from '../utils/AppError';
+
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:3004';
 
 const VALID_STATUSES = ['compliant', 'non_compliant', 'pending', 'review'] as const;
 
@@ -253,6 +256,94 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
 
     res.status(200).json({ dashboard });
   } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/compliance/analyze
+ * Fetches user compliance records and sends them to the AI Recommendation Service
+ * for gap analysis. Returns the AI analysis results.
+ */
+export async function analyzeCompliance(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      throw AppError.badRequest('userId is required');
+    }
+
+    const records = await ComplianceRecord.findAll({
+      where: { userId },
+    });
+
+    const complianceData = records.map((r) => r.toJSON());
+
+    const aiResponse = await axios.post(`${AI_SERVICE_URL}/api/inference/compliance-gaps`, {
+      complianceData,
+    });
+
+    res.status(200).json(aiResponse.data);
+  } catch (err) {
+    if (axios.isAxiosError(err) && (!err.response || err.code === 'ECONNREFUSED')) {
+      res.status(503).json({
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'AI Recommendation Service is currently unavailable. Please try again later.',
+          details: null,
+        },
+      });
+      return;
+    }
+    next(err);
+  }
+}
+
+/**
+ * GET /api/regulations/predictions
+ * Fetches regulatory predictions from the AI Recommendation Service based on
+ * the user's compliance records and their associated regulation IDs.
+ */
+export async function getRegulatoryPredictions(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = parseInt(req.query.userId as string, 10);
+
+    if (!userId || isNaN(userId)) {
+      throw AppError.badRequest('userId query parameter is required and must be a number');
+    }
+
+    const records = await ComplianceRecord.findAll({
+      where: { userId },
+    });
+
+    const regulationIds = records
+      .map((r) => r.regulationId)
+      .filter((id): id is string => id !== null);
+
+    const aiResponse = await axios.post(`${AI_SERVICE_URL}/api/inference/regulatory-predictions`, {
+      regulationIds,
+    });
+
+    res.status(200).json(aiResponse.data);
+  } catch (err) {
+    if (axios.isAxiosError(err) && (!err.response || err.code === 'ECONNREFUSED')) {
+      res.status(503).json({
+        error: {
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'AI Recommendation Service is currently unavailable. Please try again later.',
+          details: null,
+        },
+      });
+      return;
+    }
     next(err);
   }
 }

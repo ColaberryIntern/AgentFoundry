@@ -166,11 +166,35 @@ app.use(
   }),
 );
 
-// Sprint 12: AI Recommendation Service proxy (placeholder)
-// app.use('/api/recommendations', createProxyMiddleware({ target: AI_SERVICE_URL, changeOrigin: true }));
+// Sprint 13: AI Recommendation Service proxy
+app.use(
+  '/api/recommendations',
+  createProxyMiddleware({
+    target: AI_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/api/recommendations': '/api/recommendations' },
+  }),
+);
 
-// Suppress unused variable warnings for future service URLs
-void AI_SERVICE_URL;
+// Sprint 13: AI Inference proxy → AI Recommendation Service
+app.use(
+  '/api/inference',
+  createProxyMiddleware({
+    target: AI_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/api/inference': '/api/inference' },
+  }),
+);
+
+// Sprint 13: AI Models proxy → AI Recommendation Service
+app.use(
+  '/api/models',
+  createProxyMiddleware({
+    target: AI_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/api/models': '/api/models' },
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Error handling — must be last

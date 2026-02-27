@@ -10,6 +10,7 @@ import CustomReportsPage from './pages/CustomReportsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SearchPage from './pages/SearchPage';
 import WebhooksPage from './pages/WebhooksPage';
+import RecommendationsPage from './pages/RecommendationsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <Route path="reports/custom" element={<CustomReportsPage />} />
         <Route path="webhooks" element={<WebhooksPage />} />
         <Route path="search" element={<SearchPage />} />
+        <Route path="recommendations" element={<RecommendationsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

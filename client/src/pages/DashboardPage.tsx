@@ -1,7 +1,12 @@
-import { useEffect, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { useEffect, useMemo, useCallback } from 'react';
+import { Navigate, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchDashboard } from '../store/dashboardSlice';
+import {
+  fetchRecommendations,
+  fetchInferenceHealth,
+  submitFeedback,
+} from '../store/recommendationsSlice';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useDashboardWebSocket } from '../hooks/useDashboardWebSocket';
 import MetricsCards from '../components/dashboard/MetricsCards';
@@ -9,11 +14,14 @@ import ComplianceOverview from '../components/dashboard/ComplianceOverview';
 import ComplianceTrend from '../components/dashboard/ComplianceTrend';
 import RecentActivity from '../components/dashboard/RecentActivity';
 import LiveActivityFeed from '../components/dashboard/LiveActivityFeed';
+import RecommendationCard from '../components/recommendations/RecommendationCard';
+import type { FeedbackAction } from '../types/recommendations';
 
 function DashboardPage() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { dashboard, isLoading, error } = useAppSelector((state) => state.dashboard);
+  const { recommendations, inferenceHealth } = useAppSelector((state) => state.recommendations);
   const { trackPageView } = useAnalytics();
   const { isConnected, latestMetrics, latestActivity } = useDashboardWebSocket();
 
@@ -24,8 +32,23 @@ function DashboardPage() {
   useEffect(() => {
     if (user) {
       dispatch(fetchDashboard());
+      dispatch(
+        fetchRecommendations({
+          userId: String(user.id),
+          status: 'active',
+          limit: 5,
+        }),
+      );
+      dispatch(fetchInferenceHealth());
     }
   }, [dispatch, user]);
+
+  const handleRecommendationFeedback = useCallback(
+    (recommendationId: string, action: FeedbackAction) => {
+      dispatch(submitFeedback({ recommendationId, action }));
+    },
+    [dispatch],
+  );
 
   // Merge WebSocket metrics with dashboard data for real-time updates
   const liveDashboard = useMemo(() => {
@@ -116,6 +139,74 @@ function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <LiveActivityFeed latestActivity={latestActivity} isConnected={isConnected} />
         <RecentActivity records={liveDashboard.recentUpdates} />
+      </div>
+
+      {/* AI Recommendations Section */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+              AI Recommendations
+            </h2>
+            {/* AI Service health indicator */}
+            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  inferenceHealth?.status === 'healthy'
+                    ? 'bg-green-500'
+                    : inferenceHealth?.status === 'degraded'
+                      ? 'bg-yellow-500'
+                      : 'bg-red-500'
+                }`}
+              />
+              <span className="text-gray-600 dark:text-gray-400">
+                {inferenceHealth?.status === 'healthy'
+                  ? 'Online'
+                  : inferenceHealth?.status === 'degraded'
+                    ? 'Degraded'
+                    : 'Offline'}
+              </span>
+            </span>
+          </div>
+          <Link
+            to="/recommendations"
+            className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+          >
+            View All &rarr;
+          </Link>
+        </div>
+
+        {recommendations.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {recommendations.slice(0, 5).map((rec) => (
+              <RecommendationCard
+                key={rec.id}
+                recommendation={rec}
+                onFeedback={handleRecommendationFeedback}
+                compact
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <svg
+              className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No active recommendations at this time.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

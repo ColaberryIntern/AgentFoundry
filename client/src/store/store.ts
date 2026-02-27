@@ -8,6 +8,7 @@ import onboardingReducer from './onboardingSlice';
 import webhooksReducer from './webhooksSlice';
 import templatesReducer from './templatesSlice';
 import schedulesReducer from './schedulesSlice';
+import recommendationsReducer from './recommendationsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     webhooks: webhooksReducer,
     templates: templatesReducer,
     schedules: schedulesReducer,
+    recommendations: recommendationsReducer,
   },
 });
 

@@ -106,6 +106,12 @@ function Navbar() {
               >
                 Webhooks
               </Link>
+              <Link
+                to="/recommendations"
+                className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
+              >
+                AI Recommendations
+              </Link>
               {user.role === 'it_admin' && (
                 <Link
                   to="/admin/roles"
@@ -224,6 +230,13 @@ function Navbar() {
                 className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
                 Webhooks
+              </Link>
+              <Link
+                to="/recommendations"
+                onClick={closeMobileMenu}
+                className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
+              >
+                AI Recommendations
               </Link>
               {user.role === 'it_admin' && (
                 <Link
