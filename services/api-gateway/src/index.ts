@@ -5,7 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 import swaggerUi from 'swagger-ui-express';
 
 import healthRouter from './routes/health';
@@ -158,6 +158,7 @@ app.use(
     target: USER_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/users': '/api/users' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -168,6 +169,7 @@ app.use(
     target: USER_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/roles': '/api/roles' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -178,6 +180,7 @@ app.use(
     target: USER_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/keys': '/api/keys' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -188,6 +191,7 @@ app.use(
     target: COMPLIANCE_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/compliance': '/api/compliance' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -198,6 +202,7 @@ app.use(
     target: COMPLIANCE_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/agents': '/api/agents' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -209,6 +214,7 @@ app.use(
     target: COMPLIANCE_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/dashboard': '/api/dashboard' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -219,6 +225,7 @@ app.use(
     target: REPORTING_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/reports': '/api/reports' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -229,6 +236,7 @@ app.use(
     target: NOTIFICATION_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/notifications': '/api/notifications' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -239,6 +247,7 @@ app.use(
     target: NOTIFICATION_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/webhooks': '/api/webhooks' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -249,6 +258,7 @@ app.use(
     target: AI_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/recommendations': '/api/recommendations' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -260,6 +270,7 @@ app.use(
     target: AI_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/inference': '/api/inference' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -270,6 +281,7 @@ app.use(
     target: AI_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/models': '/api/models' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -280,6 +292,7 @@ app.use(
     target: AI_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/interactions': '/api/interactions' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
@@ -291,6 +304,7 @@ app.use(
     target: AI_SERVICE_URL,
     changeOrigin: true,
     pathRewrite: { '^/api/adaptive': '/api/adaptive' },
+    on: { proxyReq: fixRequestBody },
   }),
 );
 
