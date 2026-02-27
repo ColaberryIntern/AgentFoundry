@@ -1,0 +1,112 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    # Warm-up: ramp from 0 to 50 virtual users over 30 seconds
+    - duration: 30
+      arrivalRate: 5
+      rampTo: 50
+      name: "Warm-up"
+    # Sustained load: 200 virtual users per second for 60 seconds
+    - duration: 60
+      arrivalRate: 200
+      name: "Sustained load"
+    # Spike: burst to 500 virtual users per second for 30 seconds
+    - duration: 30
+      arrivalRate: 500
+      name: "Spike — 500 vus/sec"
+    # Peak burst: 1000 requests/sec for 15 seconds
+    - duration: 15
+      arrivalRate: 1000
+      name: "Peak burst — 1000 req/sec"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+  plugins:
+    expect: {}
+  environments:
+    staging:
+      target: "http://staging.agentfoundry.local:3000"
+      phases:
+        - duration: 60
+          arrivalRate: 100
+          name: "Staging sustained load"
+
+scenarios:
+  - name: "Health check"
+    weight: 10
+    flow:
+      - get:
+          url: "/health"
+          expect:
+            - statusCode: 200
+
+  - name: "Auth flow"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/users/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+      - get:
+          url: "/api/dashboard/summary"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+  - name: "Compliance check"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/users/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+      - get:
+          url: "/api/compliance"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+  - name: "AI inference"
+    weight: 20
+    flow:
+      - get:
+          url: "/api/inference/health"
+          expect:
+            - statusCode:
+                - 200
+                - 502
+
+  - name: "Search"
+    weight: 20
+    flow:
+      - get:
+          url: "/api/search?q=compliance&limit=10"
+          expect:
+            - statusCode:
+                - 200
+                - 401

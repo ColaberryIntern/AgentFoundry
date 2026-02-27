@@ -111,6 +111,10 @@ Report.init(
     tableName: 'reports',
     timestamps: true,
     underscored: false,
+    indexes: [
+      { fields: ['user_id', 'status'], name: 'idx_report_user_status' },
+      { fields: ['created_at'], name: 'idx_report_created_at' },
+    ],
   },
 );
 

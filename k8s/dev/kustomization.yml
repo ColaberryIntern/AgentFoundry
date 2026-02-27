@@ -75,3 +75,23 @@ patches:
       - op: replace
         path: /data/LOG_LEVEL
         value: debug
+
+  # ── Remove resource quotas (not needed in dev) ──
+  - target:
+      kind: ResourceQuota
+      name: staging-resource-quota
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: staging-resource-quota
+  - target:
+      kind: ResourceQuota
+      name: production-resource-quota
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: production-resource-quota

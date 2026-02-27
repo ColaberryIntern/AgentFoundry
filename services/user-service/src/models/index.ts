@@ -9,6 +9,7 @@ import { ApiKey } from './ApiKey';
 import { AuditLog } from './AuditLog';
 import { UserPreference } from './UserPreference';
 import { OnboardingProgress } from './OnboardingProgress';
+import { ConsentRecord } from './ConsentRecord';
 
 // ─────────────────────────────────────────────────────────
 // Associations
@@ -30,4 +31,8 @@ UserPreference.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 User.hasOne(OnboardingProgress, { foreignKey: 'userId', as: 'onboardingProgress' });
 OnboardingProgress.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
-export { User, ApiKey, AuditLog, UserPreference, OnboardingProgress };
+// A user has many consent records
+User.hasMany(ConsentRecord, { foreignKey: 'userId', as: 'consentRecords' });
+ConsentRecord.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+export { User, ApiKey, AuditLog, UserPreference, OnboardingProgress, ConsentRecord };

@@ -1,0 +1,82 @@
+###############################################################################
+# Blue-Green Service Switch
+# A Service that routes traffic based on the `deployment-color` label.
+# The active color is controlled by patching the selector:
+#   kubectl patch svc api-gateway-bg -p '{"spec":{"selector":{"deployment-color":"green"}}}'
+###############################################################################
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-bg
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: agent-foundry
+    app.kubernetes.io/component: blue-green
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: api-gateway
+    deployment-color: blue
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service-bg
+  labels:
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/part-of: agent-foundry
+    app.kubernetes.io/component: blue-green
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3001
+      targetPort: 3001
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: user-service
+    deployment-color: blue
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: compliance-monitor-service-bg
+  labels:
+    app.kubernetes.io/name: compliance-monitor-service
+    app.kubernetes.io/part-of: agent-foundry
+    app.kubernetes.io/component: blue-green
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3002
+      targetPort: 3002
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: compliance-monitor-service
+    deployment-color: blue
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: client-bg
+  labels:
+    app.kubernetes.io/name: client
+    app.kubernetes.io/part-of: agent-foundry
+    app.kubernetes.io/component: blue-green
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: client
+    deployment-color: blue

@@ -4,6 +4,7 @@ dotenv.config();
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import { sequelize } from './config/database';
 import './models/ComplianceRecord';
 import healthRouter from './routes/health';
@@ -21,6 +22,7 @@ const PORT = parseInt(process.env.COMPLIANCE_SERVICE_PORT || '3002', 10);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(compression());
 
 // Metrics endpoint — before auth-protected routes
 app.get('/metrics', metricsEndpoint);

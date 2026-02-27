@@ -1,0 +1,169 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: agent-foundry-production
+
+resources:
+  - ../base
+  - namespace.yml
+
+commonLabels:
+  environment: production
+
+patches:
+  # ── Replica count overrides for production ──────────────
+  # api-gateway: 3 replicas
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  # user-service: 2 replicas
+  - target:
+      kind: Deployment
+      name: user-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  # compliance-monitor-service: 2 replicas
+  - target:
+      kind: Deployment
+      name: compliance-monitor-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  # client: 2 replicas
+  - target:
+      kind: Deployment
+      name: client
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  # ── Resource limit increases for production ─────────────
+  # api-gateway: higher resources
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+  # user-service: higher resources
+  - target:
+      kind: Deployment
+      name: user-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+  # compliance-monitor-service: higher resources
+  - target:
+      kind: Deployment
+      name: compliance-monitor-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+  # ai-recommendation-service: higher resources
+  - target:
+      kind: Deployment
+      name: ai-recommendation-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 400m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+  # postgres: higher resources for production
+  - target:
+      kind: StatefulSet
+      name: postgres
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+  # redis: higher resources
+  - target:
+      kind: Deployment
+      name: redis
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+  # rabbitmq: higher resources
+  - target:
+      kind: Deployment
+      name: rabbitmq
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 300m
+            memory: 512Mi
+          limits:
+            cpu: 750m
+            memory: 1Gi
+
+  # ── ConfigMap overrides for production ──────────────────
+  - target:
+      kind: ConfigMap
+      name: agent-foundry-config
+    patch: |
+      - op: replace
+        path: /data/NODE_ENV
+        value: production
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: warn
+
+  # ── Remove staging resource quota (not needed in production) ──
+  - target:
+      kind: ResourceQuota
+      name: staging-resource-quota
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: staging-resource-quota

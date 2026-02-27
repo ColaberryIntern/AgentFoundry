@@ -1,6 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import healthRouter from './routes/health';
 import recommendationsRouter from './routes/recommendations';
@@ -21,6 +22,7 @@ const PORT = parseInt(process.env.AI_SERVICE_PORT || '3004', 10);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(compression());
 
 // Metrics endpoint — before auth-protected routes
 app.get('/metrics', metricsEndpoint);

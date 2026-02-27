@@ -1,0 +1,81 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      rampTo: 50
+      name: "Ramp up"
+    - duration: 60
+      arrivalRate: 200
+      name: "Sustained compliance load"
+    - duration: 30
+      arrivalRate: 500
+      name: "Burst — compliance endpoints"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "Authenticated compliance monitoring"
+    flow:
+      # Step 1: Authenticate
+      - post:
+          url: "/api/users/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 2: List compliance records
+      - get:
+          url: "/api/compliance"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 3: Fetch compliance dashboard
+      - get:
+          url: "/api/dashboard/summary"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 4: Get regulations list
+      - get:
+          url: "/api/compliance"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 5: Create a compliance check
+      - post:
+          url: "/api/compliance"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            complianceType: "data_privacy"
+            status: "pending"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 201
+                - 401
+                - 400

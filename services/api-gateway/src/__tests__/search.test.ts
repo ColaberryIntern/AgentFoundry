@@ -32,7 +32,7 @@ beforeAll(async () => {
 afterEach(async () => {
   // Clean up search history and cache between tests
   await SearchHistory.destroy({ where: {} });
-  cache.clear();
+  await cache.clear();
 });
 
 afterAll(async () => {

@@ -83,6 +83,63 @@ jobs:
         run: npm test
 
   # ─────────────────────────────────────────────
+  # Security Audit — dependency vulnerability scan (Sprint 18)
+  # ─────────────────────────────────────────────
+  security-audit:
+    name: Security Audit ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - user-service
+          - compliance-monitor-service
+          - reporting-service
+          - ai-recommendation-service
+          - notification-service
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install service dependencies
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Run npm audit
+        working-directory: services/${{ matrix.service }}
+        run: npm audit --audit-level=high || true
+
+  security-audit-python:
+    name: Security Audit model-server
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: services/model-server
+        run: |
+          pip install -r requirements.txt
+          pip install pip-audit
+
+      - name: Run pip-audit
+        working-directory: services/model-server
+        run: pip-audit || true
+
+  # ─────────────────────────────────────────────
   # Test Client — TypeScript check + tests
   # ─────────────────────────────────────────────
   test-client:

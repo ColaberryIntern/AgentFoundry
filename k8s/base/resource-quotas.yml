@@ -1,0 +1,38 @@
+###############################################################################
+# Resource Quotas
+# Applied per-namespace via Kustomize overlays. Base file defines templates
+# that overlays can patch. Both staging and production quotas included here
+# with namespace selectors applied by the overlay kustomization.
+###############################################################################
+---
+# Staging resource quota (applied when namespace = agent-foundry-staging)
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: staging-resource-quota
+  labels:
+    app.kubernetes.io/part-of: agent-foundry
+    environment: staging
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 4Gi
+    limits.cpu: "8"
+    limits.memory: 8Gi
+    pods: "30"
+---
+# Production resource quota (applied when namespace = agent-foundry-production)
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: production-resource-quota
+  labels:
+    app.kubernetes.io/part-of: agent-foundry
+    environment: production
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    pods: "50"

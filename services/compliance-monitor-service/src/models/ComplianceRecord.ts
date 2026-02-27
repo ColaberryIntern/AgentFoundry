@@ -96,6 +96,10 @@ ComplianceRecord.init(
     tableName: 'compliance_records',
     timestamps: true,
     underscored: false,
+    indexes: [
+      { fields: ['user_id', 'status'], name: 'idx_compliance_user_status' },
+      { fields: ['createdAt'], name: 'idx_compliance_created_at' },
+    ],
   },
 );
 

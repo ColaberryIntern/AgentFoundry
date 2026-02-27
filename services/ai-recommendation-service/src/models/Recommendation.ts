@@ -135,5 +135,9 @@ Recommendation.init(
     tableName: 'recommendations',
     underscored: true,
     timestamps: true,
+    indexes: [
+      { fields: ['user_id', 'type', 'status'], name: 'idx_rec_user_type_status' },
+      { fields: ['created_at'], name: 'idx_rec_created_at' },
+    ],
   },
 );

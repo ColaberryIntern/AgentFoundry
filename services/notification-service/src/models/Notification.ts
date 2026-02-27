@@ -75,6 +75,10 @@ Notification.init(
     tableName: 'notifications',
     timestamps: true,
     underscored: false,
+    indexes: [
+      { fields: ['user_id', 'is_read'], name: 'idx_notif_user_read' },
+      { fields: ['createdAt'], name: 'idx_notif_created_at' },
+    ],
   },
 );
 

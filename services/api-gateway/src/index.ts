@@ -17,6 +17,8 @@ import { errorHandler } from './middleware/errorHandler';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
 import { apiVersionMiddleware, createVersionRouter } from './middleware/apiVersion';
 import { correlationIdMiddleware } from './middleware/correlationId';
+import { cacheResponse } from './middleware/cacheResponse';
+import { sanitizeInput } from './middleware/sanitize';
 import logger from './utils/logger';
 import { openApiSpec } from './docs/openapi';
 import { initModels } from './models';
@@ -40,8 +42,23 @@ app.use(
     crossOriginOpenerPolicy: true,
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    // Sprint 18: X-Frame-Options DENY (blocks clickjacking)
+    frameguard: { action: 'deny' },
+    // Sprint 18: HSTS — enforce HTTPS for 1 year, include subdomains
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+    // Sprint 18: X-Content-Type-Options nosniff (enabled by default in helmet, explicit here)
+    noSniff: true,
   }),
 );
+
+// Sprint 18: Permissions-Policy — restrict browser features
+app.use((_req, res, next) => {
+  res.setHeader(
+    'Permissions-Policy',
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()',
+  );
+  next();
+});
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -51,6 +68,10 @@ app.use(
   }),
 );
 app.use(express.json());
+
+// Sprint 18: Sanitize all incoming request bodies, query params, and route params
+app.use(sanitizeInput);
+
 app.use(compression());
 
 // ---------------------------------------------------------------------------
@@ -106,8 +127,8 @@ if (process.env.NODE_ENV !== 'test') {
 // Health / liveness probe
 app.use('/health', healthRouter);
 
-// Search API — aggregated search across downstream services
-app.use('/api/search', searchRouter);
+// Search API — aggregated search across downstream services (cached 5 min)
+app.use('/api/search', cacheResponse('search', 300), searchRouter);
 
 // Analytics — engagement event tracking
 app.use('/api/analytics', analyticsRouter);
@@ -165,9 +186,10 @@ app.use(
   }),
 );
 
-// Sprint 3: Dashboard proxy → Compliance Service
+// Sprint 3: Dashboard proxy → Compliance Service (cached 30s)
 app.use(
   '/api/dashboard',
+  cacheResponse('dashboard', 30),
   createProxyMiddleware({
     target: COMPLIANCE_SERVICE_URL,
     changeOrigin: true,
@@ -215,9 +237,10 @@ app.use(
   }),
 );
 
-// Sprint 13: AI Inference proxy → AI Recommendation Service
+// Sprint 13: AI Inference proxy → AI Recommendation Service (health cached 60s)
 app.use(
   '/api/inference',
+  cacheResponse('inference', 60),
   createProxyMiddleware({
     target: AI_SERVICE_URL,
     changeOrigin: true,
@@ -245,9 +268,10 @@ app.use(
   }),
 );
 
-// Sprint 14: Adaptive Preferences proxy → AI Recommendation Service
+// Sprint 14: Adaptive Preferences proxy → AI Recommendation Service (cached 1 hour)
 app.use(
   '/api/adaptive',
+  cacheResponse('adaptive', 3600),
   createProxyMiddleware({
     target: AI_SERVICE_URL,
     changeOrigin: true,

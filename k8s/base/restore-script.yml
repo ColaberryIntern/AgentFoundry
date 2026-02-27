@@ -1,0 +1,94 @@
+###############################################################################
+# PostgreSQL Restore ConfigMap
+# Contains a restore script that can be used to restore from a backup.
+# Usage:
+#   kubectl create job --from=cronjob/postgres-backup pg-restore-manual \
+#     --dry-run=client -o yaml | \
+#     sed 's|backup.sh|restore.sh|' | kubectl apply -f -
+#
+# Or run manually in a pod:
+#   kubectl run pg-restore --rm -it --image=postgres:16-alpine \
+#     --overrides='...' -- /scripts/restore.sh <backup_filename>
+###############################################################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-restore-script
+  labels:
+    app.kubernetes.io/name: postgres-backup
+    app.kubernetes.io/part-of: agent-foundry
+data:
+  restore.sh: |
+    #!/bin/sh
+    set -e
+
+    BACKUP_DIR="/backups"
+
+    # Accept backup filename as argument, otherwise use the latest
+    if [ -n "$1" ]; then
+      BACKUP_FILE="${BACKUP_DIR}/$1"
+    else
+      BACKUP_FILE=$(ls -1t ${BACKUP_DIR}/agent_foundry_*.dump 2>/dev/null | head -1)
+    fi
+
+    if [ -z "${BACKUP_FILE}" ] || [ ! -f "${BACKUP_FILE}" ]; then
+      echo "ERROR: No backup file found."
+      echo "Usage: restore.sh [backup_filename]"
+      echo ""
+      echo "Available backups:"
+      ls -lht ${BACKUP_DIR}/agent_foundry_*.dump 2>/dev/null || echo "  (none)"
+      exit 1
+    fi
+
+    FILESIZE=$(ls -lh "${BACKUP_FILE}" | awk '{print $5}')
+    echo "=================================================="
+    echo "  PostgreSQL Restore"
+    echo "=================================================="
+    echo "Backup file : ${BACKUP_FILE}"
+    echo "File size   : ${FILESIZE}"
+    echo "Target host : ${DATABASE_HOST}:${DATABASE_PORT}"
+    echo "Target DB   : ${DATABASE_NAME}"
+    echo "Target user : ${DATABASE_USER}"
+    echo "=================================================="
+    echo ""
+    echo "WARNING: This will DROP and recreate the database."
+    echo "Press Ctrl+C within 10 seconds to abort..."
+    sleep 10
+
+    echo "[$(date)] Starting restore..."
+
+    # Drop and recreate the database
+    PGPASSWORD="${POSTGRES_PASSWORD}" psql \
+      --host="${DATABASE_HOST}" \
+      --port="${DATABASE_PORT}" \
+      --username="${DATABASE_USER}" \
+      --dbname="postgres" \
+      -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${DATABASE_NAME}' AND pid <> pg_backend_pid();" \
+      2>/dev/null || true
+
+    PGPASSWORD="${POSTGRES_PASSWORD}" dropdb \
+      --host="${DATABASE_HOST}" \
+      --port="${DATABASE_PORT}" \
+      --username="${DATABASE_USER}" \
+      --if-exists \
+      "${DATABASE_NAME}"
+
+    PGPASSWORD="${POSTGRES_PASSWORD}" createdb \
+      --host="${DATABASE_HOST}" \
+      --port="${DATABASE_PORT}" \
+      --username="${DATABASE_USER}" \
+      "${DATABASE_NAME}"
+
+    # Restore from the custom-format dump
+    PGPASSWORD="${POSTGRES_PASSWORD}" pg_restore \
+      --host="${DATABASE_HOST}" \
+      --port="${DATABASE_PORT}" \
+      --username="${DATABASE_USER}" \
+      --dbname="${DATABASE_NAME}" \
+      --no-owner \
+      --no-privileges \
+      --verbose \
+      "${BACKUP_FILE}"
+
+    echo ""
+    echo "[$(date)] Restore completed successfully from: ${BACKUP_FILE}"

@@ -21,11 +21,16 @@
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "install:all": "npm install && cd client && npm install && cd ../services/api-gateway && npm install && cd ../user-service && npm install && cd ../compliance-monitor-service && npm install && cd ../reporting-service && npm install && cd ../ai-recommendation-service && npm install && cd ../notification-service && npm install",
     "build:all": "cd client && npm run build && cd ../services/api-gateway && npm run build && cd ../user-service && npm run build && cd ../compliance-monitor-service && npm run build && cd ../reporting-service && npm run build && cd ../ai-recommendation-service && npm run build && cd ../notification-service && npm run build",
+    "load-test": "npx artillery run tests/load/artillery-config.yml",
+    "load-test:auth": "npx artillery run tests/load/scenarios/auth-flow.yml",
+    "load-test:compliance": "npx artillery run tests/load/scenarios/compliance-check.yml",
+    "load-test:ai": "npx artillery run tests/load/scenarios/ai-inference.yml",
     "prepare": "husky"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
+    "artillery": "^2.0.30",
     "eslint": "^8.57.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.0",

@@ -1,0 +1,113 @@
+###############################################################################
+# ServiceMonitor CRDs for Prometheus Operator
+# Scrapes /metrics endpoint from each service at 30s intervals.
+# Requires prometheus-operator / kube-prometheus-stack to be installed.
+###############################################################################
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api-gateway-monitor
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: agent-foundry
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: user-service-monitor
+  labels:
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/part-of: agent-foundry
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: user-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: compliance-monitor-service-monitor
+  labels:
+    app.kubernetes.io/name: compliance-monitor-service
+    app.kubernetes.io/part-of: agent-foundry
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: compliance-monitor-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: reporting-service-monitor
+  labels:
+    app.kubernetes.io/name: reporting-service
+    app.kubernetes.io/part-of: agent-foundry
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: reporting-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ai-recommendation-service-monitor
+  labels:
+    app.kubernetes.io/name: ai-recommendation-service
+    app.kubernetes.io/part-of: agent-foundry
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-recommendation-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notification-service-monitor
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/part-of: agent-foundry
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

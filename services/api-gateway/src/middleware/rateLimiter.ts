@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+import { getRedisClient } from '../utils/redisClient';
 
 // ---------------------------------------------------------------------------
 // Tier definitions
@@ -18,13 +20,29 @@ export const RATE_LIMIT_TIERS: Record<string, RateLimitTier> = {
 
 // ---------------------------------------------------------------------------
 // Build a rate limiter instance for a given tier.
+// Uses Redis store when available, falls back to the default in-memory store.
 // ---------------------------------------------------------------------------
 function buildLimiter(tier: RateLimitTier): RateLimitRequestHandler {
+  const redis = getRedisClient();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const storeOption: any = {};
+
+  if (redis && process.env.NODE_ENV !== 'test') {
+    storeOption.store = new RedisStore({
+      // Use `sendCommand` adapter expected by rate-limit-redis
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sendCommand: ((...args: string[]) => redis.call(args[0], ...args.slice(1))) as any,
+      prefix: `rl:${tier.name}:`,
+    });
+  }
+
   return rateLimit({
     windowMs: tier.windowMs,
     max: tier.maxRequests,
     standardHeaders: false,
     legacyHeaders: false,
+    ...storeOption,
     keyGenerator: (req: Request) => {
       // Use user ID for authenticated requests, IP for anonymous
       return (req as Request & { user?: { userId?: string } }).user?.userId ?? req.ip ?? 'unknown';

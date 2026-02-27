@@ -1,0 +1,96 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      rampTo: 50
+      name: "Ramp up"
+    - duration: 60
+      arrivalRate: 100
+      name: "Sustained AI inference load"
+    - duration: 30
+      arrivalRate: 300
+      name: "Burst — AI endpoints"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "AI inference health check"
+    weight: 30
+    flow:
+      # Inference health — cached 60s
+      - get:
+          url: "/api/inference/health"
+          expect:
+            - statusCode:
+                - 200
+                - 502
+
+  - name: "AI recommendation flow"
+    weight: 40
+    flow:
+      # Step 1: Authenticate
+      - post:
+          url: "/api/users/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 2: List recommendations
+      - get:
+          url: "/api/recommendations"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 3: Fetch adaptive preferences (cached 1 hour)
+      - get:
+          url: "/api/adaptive/preferences"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+                - 404
+
+  - name: "AI models listing"
+    weight: 30
+    flow:
+      # Step 1: Authenticate
+      - post:
+          url: "/api/users/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 2: List models
+      - get:
+          url: "/api/models"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401

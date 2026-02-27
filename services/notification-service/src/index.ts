@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import healthRouter from './routes/health';
 import notificationRouter from './routes/notifications';
@@ -23,6 +24,7 @@ const PORT = parseInt(process.env.NOTIFICATION_SERVICE_PORT || '3005', 10);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(compression());
 
 // Metrics endpoint — before auth-protected routes
 app.get('/metrics', metricsEndpoint);

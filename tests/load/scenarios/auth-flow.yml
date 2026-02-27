@@ -1,0 +1,71 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      rampTo: 100
+      name: "Ramp up"
+    - duration: 60
+      arrivalRate: 200
+      name: "Sustained auth load"
+    - duration: 30
+      arrivalRate: 500
+      name: "Burst"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "Login → Dashboard → Generate Report"
+    flow:
+      # Step 1: Authenticate
+      - post:
+          url: "/api/users/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 2: Fetch dashboard data (cached 30s)
+      - get:
+          url: "/api/dashboard/summary"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+
+      # Step 3: Fetch dashboard metrics
+      - get:
+          url: "/api/dashboard/metrics"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 200
+                - 401
+                - 404
+
+      # Step 4: Generate a compliance report
+      - post:
+          url: "/api/reports"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            reportType: "compliance_summary"
+            format: "pdf"
+          ifTrue: "authToken"
+          expect:
+            - statusCode:
+                - 201
+                - 401
+                - 400

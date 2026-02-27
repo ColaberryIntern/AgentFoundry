@@ -1,0 +1,137 @@
+###############################################################################
+# Pod Disruption Budgets
+# Ensures minimum availability during voluntary disruptions (node drains,
+# upgrades, etc.).
+###############################################################################
+---
+# Stateless application services — keep at least 1 pod available
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway-pdb
+  labels:
+    app.kubernetes.io/name: api-gateway
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: user-service-pdb
+  labels:
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: user-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: compliance-monitor-service-pdb
+  labels:
+    app.kubernetes.io/name: compliance-monitor-service
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: compliance-monitor-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: reporting-service-pdb
+  labels:
+    app.kubernetes.io/name: reporting-service
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: reporting-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ai-recommendation-service-pdb
+  labels:
+    app.kubernetes.io/name: ai-recommendation-service
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-recommendation-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: notification-service-pdb
+  labels:
+    app.kubernetes.io/name: notification-service
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: client-pdb
+  labels:
+    app.kubernetes.io/name: client
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: client
+---
+# Stateful services — never evict (maxUnavailable: 0)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgres-pdb
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: redis-pdb
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rabbitmq-pdb
+  labels:
+    app.kubernetes.io/name: rabbitmq
+    app.kubernetes.io/part-of: agent-foundry
+spec:
+  maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq

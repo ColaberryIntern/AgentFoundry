@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: agent-foundry-staging
+
+resources:
+  - ../base
+
+commonLabels:
+  environment: staging
+
+patches:
+  # ── Staging uses base replica counts (2) ────────────────
+  # No replica overrides needed — base defaults are fine for staging
+
+  # ── ConfigMap overrides for staging ─────────────────────
+  - target:
+      kind: ConfigMap
+      name: agent-foundry-config
+    patch: |
+      - op: replace
+        path: /data/NODE_ENV
+        value: staging
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: info
+
+  # ── Remove production resource quota (not needed in staging) ──
+  - target:
+      kind: ResourceQuota
+      name: production-resource-quota
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: ResourceQuota
+      metadata:
+        name: production-resource-quota

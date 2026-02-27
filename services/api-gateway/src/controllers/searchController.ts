@@ -157,7 +157,7 @@ export async function search(req: Request, res: Response, next: NextFunction): P
 
     // Check cache first (5-minute TTL)
     const cacheKey = `search:${query}:${searchType}:${status || ''}:${page}`;
-    const cached = cache.get<{
+    const cached = await cache.get<{
       results: SearchResult[];
       total: number;
       page: number;
@@ -242,7 +242,7 @@ export async function search(req: Request, res: Response, next: NextFunction): P
     };
 
     // Cache the response for 5 minutes (300 seconds)
-    cache.set(cacheKey, responseBody, 300);
+    await cache.set(cacheKey, responseBody, 300);
 
     res.status(200).json(responseBody);
   } catch (err) {
@@ -269,7 +269,7 @@ export async function suggestions(req: Request, res: Response, next: NextFunctio
 
     // Check cache first (2-minute TTL)
     const suggestionsCacheKey = `suggestions:${userId || 'anon'}:${prefix}`;
-    const cachedSuggestions = cache.get<{ suggestions: string[] }>(suggestionsCacheKey);
+    const cachedSuggestions = await cache.get<{ suggestions: string[] }>(suggestionsCacheKey);
     if (cachedSuggestions) {
       res.status(200).json(cachedSuggestions);
       return;
@@ -304,7 +304,7 @@ export async function suggestions(req: Request, res: Response, next: NextFunctio
     };
 
     // Cache suggestions for 2 minutes (120 seconds)
-    cache.set(suggestionsCacheKey, suggestionsResponse, 120);
+    await cache.set(suggestionsCacheKey, suggestionsResponse, 120);
 
     res.status(200).json(suggestionsResponse);
   } catch (err) {

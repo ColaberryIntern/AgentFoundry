@@ -4,6 +4,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import { sequelize } from './config/database';
 import './models'; // Register all models and associations
 import healthRouter from './routes/health';
@@ -12,6 +13,7 @@ import preferencesRouter from './routes/preferences';
 import onboardingRouter from './routes/onboarding';
 import rolesRouter from './routes/roles';
 import apiKeysRouter from './routes/apiKeys';
+import gdprRouter from './routes/gdpr';
 import { authenticate } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
@@ -23,6 +25,7 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+app.use(compression());
 
 // Metrics endpoint — before auth-protected routes
 app.get('/metrics', metricsEndpoint);
@@ -50,6 +53,7 @@ if (process.env.NODE_ENV !== 'test') {
 app.use('/health', healthRouter);
 app.use('/api/users/onboarding', authenticate, onboardingRouter);
 app.use('/api/users/preferences', authenticate, preferencesRouter);
+app.use('/api/users/gdpr', gdprRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/roles', rolesRouter);
 app.use('/api/keys', apiKeysRouter);

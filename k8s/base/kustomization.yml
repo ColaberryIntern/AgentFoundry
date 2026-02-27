@@ -19,3 +19,11 @@ resources:
   - notification-service.yml
   - client.yml
   - ingress.yml
+  # Sprint 20 — Production & DR
+  - hpa.yml
+  - pdb.yml
+  - network-policies.yml
+  - postgres-backup.yml
+  - restore-script.yml
+  - resource-quotas.yml
+  - service-monitors.yml
