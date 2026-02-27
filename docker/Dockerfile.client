@@ -1,0 +1,36 @@
+# ============================================================
+# Multi-stage Dockerfile for Agent Foundry React client
+# Usage:
+#   docker build -f docker/Dockerfile.client .
+# ============================================================
+
+# ---------- Stage 1: Build ----------
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package manifests first for layer caching
+COPY client/package.json client/package-lock.json* ./
+
+RUN npm ci
+
+# Copy the rest of the client source
+COPY client/ ./
+
+RUN npm run build
+
+# ---------- Stage 2: Runtime ----------
+FROM nginx:alpine AS runtime
+
+# Remove the default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copy custom nginx config
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy built assets from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

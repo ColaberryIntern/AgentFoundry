@@ -1,0 +1,49 @@
+{
+  "name": "agent-foundry",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered regulatory compliance platform — automated governance for C-suite executives",
+  "scripts": {
+    "dev": "docker compose up --build",
+    "dev:client": "cd client && npm run dev",
+    "dev:gateway": "cd services/api-gateway && npm run dev",
+    "dev:user": "cd services/user-service && npm run dev",
+    "dev:compliance": "cd services/compliance-monitor-service && npm run dev",
+    "dev:reporting": "cd services/reporting-service && npm run dev",
+    "dev:ai": "cd services/ai-recommendation-service && npm run dev",
+    "dev:notification": "cd services/notification-service && npm run dev",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "cd services/api-gateway && npm test && cd ../user-service && npm test && cd ../compliance-monitor-service && npm test && cd ../reporting-service && npm test && cd ../ai-recommendation-service && npm test && cd ../notification-service && npm test",
+    "test:integration": "cd tests/integration && npx jest",
+    "test:e2e": "cd tests/e2e && npx playwright test",
+    "lint": "eslint . --ext .ts,.tsx --ignore-path .gitignore",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix --ignore-path .gitignore",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "install:all": "npm install && cd client && npm install && cd ../services/api-gateway && npm install && cd ../user-service && npm install && cd ../compliance-monitor-service && npm install && cd ../reporting-service && npm install && cd ../ai-recommendation-service && npm install && cd ../notification-service && npm install",
+    "build:all": "cd client && npm run build && cd ../services/api-gateway && npm run build && cd ../user-service && npm run build && cd ../compliance-monitor-service && npm run build && cd ../reporting-service && npm run build && cd ../ai-recommendation-service && npm run build && cd ../notification-service && npm run build",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.0",
+    "husky": "^9.1.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.2.0",
+    "typescript": "^5.4.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

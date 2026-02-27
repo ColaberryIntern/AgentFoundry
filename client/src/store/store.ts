@@ -1,0 +1,27 @@
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from './authSlice';
+import dashboardReducer from './dashboardSlice';
+import reportsReducer from './reportsSlice';
+import notificationsReducer from './notificationsSlice';
+import searchReducer from './searchSlice';
+import onboardingReducer from './onboardingSlice';
+import webhooksReducer from './webhooksSlice';
+import templatesReducer from './templatesSlice';
+import schedulesReducer from './schedulesSlice';
+
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    dashboard: dashboardReducer,
+    reports: reportsReducer,
+    notifications: notificationsReducer,
+    search: searchReducer,
+    onboarding: onboardingReducer,
+    webhooks: webhooksReducer,
+    templates: templatesReducer,
+    schedules: schedulesReducer,
+  },
+});
+
+export type RootState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;

@@ -1,0 +1,77 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: agent-foundry-dev
+
+resources:
+  - ../base
+
+# Override replica counts to 1 for dev environment
+patches:
+  # api-gateway: 1 replica
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # user-service: 1 replica
+  - target:
+      kind: Deployment
+      name: user-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # compliance-monitor-service: 1 replica
+  - target:
+      kind: Deployment
+      name: compliance-monitor-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # reporting-service: 1 replica
+  - target:
+      kind: Deployment
+      name: reporting-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # ai-recommendation-service: 1 replica
+  - target:
+      kind: Deployment
+      name: ai-recommendation-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # notification-service: 1 replica
+  - target:
+      kind: Deployment
+      name: notification-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # client: 1 replica
+  - target:
+      kind: Deployment
+      name: client
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # Override NODE_ENV to development in configmap
+  - target:
+      kind: ConfigMap
+      name: agent-foundry-config
+    patch: |
+      - op: replace
+        path: /data/NODE_ENV
+        value: development
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: debug

@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+
+resources:
+  - namespace.yml
+  - configmap.yml
+  - secrets.yml
+  - postgres.yml
+  - rabbitmq.yml
+  - redis.yml
+  - api-gateway.yml
+  - user-service.yml
+  - compliance-monitor-service.yml
+  - reporting-service.yml
+  - ai-recommendation-service.yml
+  - notification-service.yml
+  - client.yml
+  - ingress.yml

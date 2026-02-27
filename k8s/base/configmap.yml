@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-foundry-config
+  labels:
+    app.kubernetes.io/name: agent-foundry-config
+    app.kubernetes.io/part-of: agent-foundry
+data:
+  # Database
+  DATABASE_HOST: postgres
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: agent_foundry
+  DATABASE_USER: agent_foundry
+  DATABASE_URL: postgresql://agent_foundry:$(POSTGRES_PASSWORD)@postgres:5432/agent_foundry
+
+  # RabbitMQ
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_URL: amqp://rabbitmq:5672
+
+  # Redis
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_URL: redis://redis:6379
+
+  # Service ports
+  API_GATEWAY_PORT: "3000"
+  USER_SERVICE_PORT: "3001"
+  COMPLIANCE_MONITOR_SERVICE_PORT: "3002"
+  REPORTING_SERVICE_PORT: "3003"
+  AI_RECOMMENDATION_SERVICE_PORT: "3004"
+  NOTIFICATION_SERVICE_PORT: "3005"
+
+  # Service URLs (internal cluster DNS)
+  API_GATEWAY_URL: http://api-gateway:3000
+  USER_SERVICE_URL: http://user-service:3001
+  COMPLIANCE_MONITOR_SERVICE_URL: http://compliance-monitor-service:3002
+  REPORTING_SERVICE_URL: http://reporting-service:3003
+  AI_RECOMMENDATION_SERVICE_URL: http://ai-recommendation-service:3004
+  NOTIFICATION_SERVICE_URL: http://notification-service:3005
+
+  # General
+  NODE_ENV: production
+  LOG_LEVEL: info

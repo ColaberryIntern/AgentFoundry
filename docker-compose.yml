@@ -1,0 +1,221 @@
+# ============================================================
+# Agent Foundry — Docker Compose (Production-like)
+# ============================================================
+# Usage:
+#   docker compose up --build          (full stack)
+#   docker compose up postgres redis   (infra only)
+#
+# Dev hot-reload is provided via docker-compose.override.yml
+# which is loaded automatically by "docker compose up".
+# ============================================================
+
+name: agent-foundry
+
+x-common-env: &common-env
+  DATABASE_URL: postgresql://agentfoundry:localdev@postgres:5432/agentfoundry_db
+  RABBITMQ_URL: amqp://rabbitmq:5672
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: dev-jwt-secret-change-in-production
+  NODE_ENV: production
+
+services:
+  # --------------------------------------------------------
+  # Infrastructure
+  # --------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: agentfoundry
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: agentfoundry_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - agent-foundry-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentfoundry -d agentfoundry_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - agent-foundry-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - agent-foundry-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --------------------------------------------------------
+  # Application services
+  # --------------------------------------------------------
+  api-gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/api-gateway
+        PORT: "3000"
+    ports:
+      - "3000:3000"
+    environment:
+      <<: *common-env
+      PORT: "3000"
+      USER_SERVICE_URL: http://user-service:3001
+      COMPLIANCE_SERVICE_URL: http://compliance-monitor-service:3002
+      REPORTING_SERVICE_URL: http://reporting-service:3003
+      AI_SERVICE_URL: http://ai-recommendation-service:3004
+      NOTIFICATION_SERVICE_URL: http://notification-service:3005
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agent-foundry-network
+
+  user-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/user-service
+        PORT: "3001"
+    ports:
+      - "3001:3001"
+    environment:
+      <<: *common-env
+      PORT: "3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - agent-foundry-network
+
+  compliance-monitor-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/compliance-monitor-service
+        PORT: "3002"
+    ports:
+      - "3002:3002"
+    environment:
+      <<: *common-env
+      PORT: "3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - agent-foundry-network
+
+  reporting-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/reporting-service
+        PORT: "3003"
+    ports:
+      - "3003:3003"
+    environment:
+      <<: *common-env
+      PORT: "3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - agent-foundry-network
+
+  ai-recommendation-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/ai-recommendation-service
+        PORT: "3004"
+    ports:
+      - "3004:3004"
+    environment:
+      <<: *common-env
+      PORT: "3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - agent-foundry-network
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+      args:
+        SERVICE_DIR: services/notification-service
+        PORT: "3005"
+    ports:
+      - "3005:3005"
+    environment:
+      <<: *common-env
+      PORT: "3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agent-foundry-network
+
+  client:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.client
+    ports:
+      - "8080:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - agent-foundry-network
+
+# --------------------------------------------------------
+# Networks
+# --------------------------------------------------------
+networks:
+  agent-foundry-network:
+    driver: bridge
+
+# --------------------------------------------------------
+# Volumes
+# --------------------------------------------------------
+volumes:
+  postgres_data:
+  redis_data:

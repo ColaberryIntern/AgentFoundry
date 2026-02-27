@@ -1,0 +1,57 @@
+import { useTheme } from '../contexts/ThemeContext';
+
+const THEMES = ['light', 'dark', 'system'] as const;
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+
+  const handleClick = () => {
+    const currentIndex = THEMES.indexOf(theme);
+    const nextIndex = (currentIndex + 1) % THEMES.length;
+    setTheme(THEMES[nextIndex]);
+  };
+
+  const label = theme === 'light' ? 'Light mode' : theme === 'dark' ? 'Dark mode' : 'System theme';
+
+  return (
+    <button
+      onClick={handleClick}
+      aria-label={label}
+      title={label}
+      className="p-1.5 rounded-md text-primary-200 hover:text-white hover:bg-primary-600 transition-colors"
+    >
+      {theme === 'light' && (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 7.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+          />
+        </svg>
+      )}
+      {theme === 'dark' && (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.005 9.005 0 0012 21a9.005 9.005 0 008.354-5.646z"
+          />
+        </svg>
+      )}
+      {theme === 'system' && (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+          />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+export default ThemeToggle;
