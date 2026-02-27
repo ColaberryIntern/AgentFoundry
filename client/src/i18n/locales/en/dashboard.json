@@ -1,0 +1,23 @@
+{
+  "title": "Dashboard",
+  "subtitle": "Compliance monitoring overview",
+  "loading": "Loading dashboard...",
+  "error": {
+    "title": "Failed to load dashboard",
+    "retry": "Retry"
+  },
+  "noData": "No dashboard data available",
+  "live": "Live",
+  "metrics": {
+    "complianceRate": "Compliance Rate",
+    "openIssues": "Open Issues",
+    "alerts": "Alerts",
+    "totalReports": "Total Reports"
+  },
+  "sections": {
+    "preferredAreas": "Preferred Compliance Areas",
+    "topFeatures": "Your Top Features",
+    "recommendations": "AI Recommendations",
+    "recentActivity": "Recent Activity"
+  }
+}

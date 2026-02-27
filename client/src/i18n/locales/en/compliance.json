@@ -1,0 +1,42 @@
+{
+  "title": "Compliance",
+  "overview": "Compliance Overview",
+  "gaps": {
+    "title": "Compliance Gaps",
+    "description": "Areas that require attention to meet regulatory standards",
+    "noGaps": "No compliance gaps identified"
+  },
+  "status": {
+    "compliant": "Compliant",
+    "nonCompliant": "Non-Compliant",
+    "pending": "Pending Review",
+    "inProgress": "In Progress",
+    "atRisk": "At Risk"
+  },
+  "recommendations": {
+    "title": "Compliance Recommendations",
+    "accept": "Accept",
+    "dismiss": "Dismiss",
+    "implement": "Implement",
+    "feedback": "Provide Feedback"
+  },
+  "reports": {
+    "title": "Compliance Reports",
+    "generate": "Generate Report",
+    "download": "Download",
+    "schedule": "Schedule Report"
+  },
+  "regulations": {
+    "title": "Regulations",
+    "gdpr": "GDPR",
+    "hipaa": "HIPAA",
+    "sox": "SOX",
+    "pci": "PCI DSS",
+    "iso27001": "ISO 27001"
+  },
+  "audit": {
+    "title": "Audit Trail",
+    "lastAudit": "Last Audit",
+    "nextAudit": "Next Scheduled Audit"
+  }
+}

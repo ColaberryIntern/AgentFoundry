@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { store } from './store/store';
 import { ThemeProvider } from './contexts/ThemeContext';
 import App from './App';
+import './i18n'; // Initialize i18next before rendering
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

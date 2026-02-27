@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { logout } from '../store/authSlice';
 import NotificationBell from './NotificationBell';
@@ -7,11 +8,17 @@ import ThemeToggle from './ThemeToggle';
 import GlobalSearch from './GlobalSearch';
 
 function Navbar() {
+  const { t } = useTranslation('navigation');
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { user } = useAppSelector((state) => state.auth);
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+
+  /** Returns aria-current="page" when the given path matches the current route */
+  const ariaCurrent = (path: string): { 'aria-current'?: 'page' } =>
+    location.pathname === path ? { 'aria-current': 'page' as const } : {};
 
   const openGlobalSearch = useCallback(() => setGlobalSearchOpen(true), []);
   const closeGlobalSearch = useCallback(() => setGlobalSearchOpen(false), []);
@@ -52,7 +59,11 @@ function Navbar() {
   }, []);
 
   return (
-    <nav className="bg-primary-700 text-white shadow-md">
+    <nav
+      role="navigation"
+      aria-label={t('mainNavigation')}
+      className="bg-primary-700 text-white shadow-md"
+    >
       <GlobalSearch isOpen={globalSearchOpen} onClose={closeGlobalSearch} />
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="text-xl font-bold tracking-tight">
@@ -67,9 +78,15 @@ function Navbar() {
               <button
                 onClick={openGlobalSearch}
                 className="flex items-center gap-1.5 px-2.5 py-1 text-sm text-primary-200 hover:text-white transition-colors rounded-md hover:bg-primary-600"
-                title="Search (Ctrl+K)"
+                title={`${t('search')} (${t('searchShortcut')})`}
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -77,47 +94,69 @@ function Navbar() {
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-                <span className="text-xs text-primary-300">Ctrl+K</span>
+                <span className="text-xs text-primary-300">{t('searchShortcut')}</span>
               </button>
               <span className="text-sm text-primary-200">
                 {user.email} ({roleLabel(user.role)})
               </span>
               <Link
                 to="/dashboard"
+                {...ariaCurrent('/dashboard')}
                 className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
               >
-                Dashboard
+                {t('dashboard')}
               </Link>
               <Link
                 to="/reports"
+                {...ariaCurrent('/reports')}
                 className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
               >
-                Reports
+                {t('reports')}
               </Link>
               <Link
                 to="/reports/custom"
+                {...ariaCurrent('/reports/custom')}
                 className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
               >
-                Custom Reports
+                {t('customReports')}
               </Link>
               <Link
                 to="/webhooks"
+                {...ariaCurrent('/webhooks')}
                 className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
               >
-                Webhooks
+                {t('webhooks')}
               </Link>
               <Link
                 to="/recommendations"
+                {...ariaCurrent('/recommendations')}
                 className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
               >
-                AI Recommendations
+                {t('recommendations')}
+              </Link>
+              <Link
+                to="/compliance"
+                {...ariaCurrent('/compliance')}
+                className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
+              >
+                Advanced Compliance
               </Link>
               {user.role === 'it_admin' && (
                 <Link
-                  to="/admin/roles"
+                  to="/agents"
+                  {...ariaCurrent('/agents')}
                   className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
                 >
-                  Manage Roles
+                  Agents
+                </Link>
+              )}
+              {user.role === 'it_admin' && (
+                <Link
+                  to="/admin/roles"
+                  {...ariaCurrent('/admin/roles')}
+                  className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
+                >
+                  {t('manageRoles')}
                 </Link>
               )}
               <NotificationBell />
@@ -125,7 +164,7 @@ function Navbar() {
                 onClick={handleLogout}
                 className="px-3 py-1 text-sm bg-primary-800 hover:bg-primary-900 rounded-md transition-colors"
               >
-                Logout
+                {t('auth:logout', 'Logout')}
               </button>
             </>
           ) : (
@@ -134,13 +173,13 @@ function Navbar() {
                 to="/login"
                 className="px-3 py-1 text-sm hover:text-primary-200 transition-colors"
               >
-                Sign In
+                {t('signIn')}
               </Link>
               <Link
                 to="/register"
                 className="px-3 py-1 text-sm bg-white text-primary-700 rounded-md hover:bg-primary-50 transition-colors font-medium"
               >
-                Get Started
+                {t('getStarted')}
               </Link>
             </>
           )}
@@ -152,11 +191,18 @@ function Navbar() {
           <ThemeToggle />
           <button
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            aria-label="Toggle menu"
+            aria-label={t('toggleMenu')}
+            aria-expanded={mobileMenuOpen}
             className="p-1.5 rounded-md hover:bg-primary-600 transition-colors"
           >
             {mobileMenuOpen ? (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -165,7 +211,13 @@ function Navbar() {
                 />
               </svg>
             ) : (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -193,7 +245,13 @@ function Navbar() {
                 }}
                 className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -201,50 +259,66 @@ function Navbar() {
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
-                Search
+                {t('search')}
               </button>
               <Link
                 to="/dashboard"
                 onClick={closeMobileMenu}
                 className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
-                Dashboard
+                {t('dashboard')}
               </Link>
               <Link
                 to="/reports"
                 onClick={closeMobileMenu}
                 className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
-                Reports
+                {t('reports')}
               </Link>
               <Link
                 to="/reports/custom"
                 onClick={closeMobileMenu}
                 className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
-                Custom Reports
+                {t('customReports')}
               </Link>
               <Link
                 to="/webhooks"
                 onClick={closeMobileMenu}
                 className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
-                Webhooks
+                {t('webhooks')}
               </Link>
               <Link
                 to="/recommendations"
                 onClick={closeMobileMenu}
                 className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
-                AI Recommendations
+                {t('recommendations')}
               </Link>
+              <Link
+                to="/compliance"
+                onClick={closeMobileMenu}
+                className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
+              >
+                Advanced Compliance
+              </Link>
+              {user.role === 'it_admin' && (
+                <Link
+                  to="/agents"
+                  onClick={closeMobileMenu}
+                  className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
+                >
+                  Agents
+                </Link>
+              )}
               {user.role === 'it_admin' && (
                 <Link
                   to="/admin/roles"
                   onClick={closeMobileMenu}
                   className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
                 >
-                  Manage Roles
+                  {t('manageRoles')}
                 </Link>
               )}
               <Link
@@ -252,13 +326,13 @@ function Navbar() {
                 onClick={closeMobileMenu}
                 className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
-                Notifications
+                {t('notifications')}
               </Link>
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-3 py-2 text-sm bg-primary-800 hover:bg-primary-900 rounded-md transition-colors"
               >
-                Logout
+                {t('auth:logout', 'Logout')}
               </button>
             </>
           ) : (
@@ -268,14 +342,14 @@ function Navbar() {
                 onClick={closeMobileMenu}
                 className="block px-3 py-2 text-sm hover:bg-primary-600 rounded-md transition-colors"
               >
-                Sign In
+                {t('signIn')}
               </Link>
               <Link
                 to="/register"
                 onClick={closeMobileMenu}
                 className="block px-3 py-2 text-sm bg-white text-primary-700 rounded-md hover:bg-primary-50 transition-colors font-medium text-center"
               >
-                Get Started
+                {t('getStarted')}
               </Link>
             </>
           )}

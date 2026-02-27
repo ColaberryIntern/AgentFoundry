@@ -162,6 +162,8 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       {/* Modal */}
       <div
         ref={modalRef}
+        role="search"
+        aria-label="Global search"
         className={`relative w-full max-w-lg bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-transform duration-150 ${
           isVisible ? 'scale-100' : 'scale-95'
         }`}
@@ -187,6 +189,9 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
+            aria-label="Global search"
+            aria-expanded={visibleSuggestions.length > 0 || (nlMode && nlSearchResult !== null)}
+            aria-autocomplete="list"
             placeholder={
               nlMode
                 ? 'Ask in natural language, e.g. "show me failed compliance reports"'

@@ -42,7 +42,11 @@ function RegisterPage() {
         </h1>
 
         {displayError && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-700 dark:text-red-400 text-sm">
+          <div
+            id="register-error"
+            role="alert"
+            className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-700 dark:text-red-400 text-sm"
+          >
             {displayError}
           </div>
         )}
@@ -61,6 +65,8 @@ function RegisterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              aria-invalid={!!displayError}
+              aria-describedby={displayError ? 'register-error' : undefined}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="you@company.com"
             />
@@ -79,6 +85,8 @@ function RegisterPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              aria-invalid={!!displayError}
+              aria-describedby={displayError ? 'register-error' : undefined}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="Min 8 chars, 1 upper, 1 number, 1 special"
             />
@@ -97,6 +105,8 @@ function RegisterPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
+              aria-invalid={!!localError}
+              aria-describedby={localError ? 'register-error' : undefined}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>

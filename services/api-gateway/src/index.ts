@@ -186,6 +186,16 @@ app.use(
   }),
 );
 
+// Sprint 21: Agent Management proxy → Compliance Service
+app.use(
+  '/api/agents',
+  createProxyMiddleware({
+    target: COMPLIANCE_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/api/agents': '/api/agents' },
+  }),
+);
+
 // Sprint 3: Dashboard proxy → Compliance Service (cached 30s)
 app.use(
   '/api/dashboard',

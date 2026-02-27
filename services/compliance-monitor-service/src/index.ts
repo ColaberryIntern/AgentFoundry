@@ -7,10 +7,14 @@ import cors from 'cors';
 import compression from 'compression';
 import { sequelize } from './config/database';
 import './models/ComplianceRecord';
+import './models/AgentStack';
+import './models/ComplianceCalendar';
 import healthRouter from './routes/health';
 import complianceRouter from './routes/compliance';
 import dashboardRouter from './routes/dashboard';
 import regulationsRouter from './routes/regulations';
+import agentsRouter from './routes/agents';
+import calendarRouter from './routes/calendar';
 import { errorHandler } from './middleware/errorHandler';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
 import logger from './utils/logger';
@@ -48,9 +52,11 @@ if (process.env.NODE_ENV !== 'test') {
 
 // --------------- Routes ---------------
 app.use('/health', healthRouter);
+app.use('/api/compliance/calendar', calendarRouter);
 app.use('/api/compliance', complianceRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/regulations', regulationsRouter);
+app.use('/api/agents', agentsRouter);
 
 // --------------- Error Handling ---------------
 app.use(errorHandler);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchDashboard } from '../store/dashboardSlice';
 import {
@@ -15,6 +16,7 @@ import AdaptiveDashboard from '../components/dashboard/AdaptiveDashboard';
 import type { FeedbackAction } from '../types/recommendations';
 
 function DashboardPage() {
+  const { t } = useTranslation('dashboard');
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { dashboard, isLoading, error } = useAppSelector((state) => state.dashboard);
@@ -80,7 +82,7 @@ function DashboardPage() {
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Loading dashboard...</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{t('loading')}</p>
         </div>
       </div>
     );
@@ -90,13 +92,13 @@ function DashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 max-w-md text-center">
-          <p className="text-red-800 dark:text-red-400 font-medium">Failed to load dashboard</p>
+          <p className="text-red-800 dark:text-red-400 font-medium">{t('error.title')}</p>
           <p className="text-red-600 dark:text-red-500 text-sm mt-1">{error}</p>
           <button
             onClick={() => dispatch(fetchDashboard())}
             className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm font-medium"
           >
-            Retry
+            {t('error.retry')}
           </button>
         </div>
       </div>
@@ -106,7 +108,7 @@ function DashboardPage() {
   if (!liveDashboard) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-400 dark:text-gray-500">No dashboard data available</p>
+        <p className="text-gray-400 dark:text-gray-500">{t('noData')}</p>
       </div>
     );
   }
@@ -116,11 +118,9 @@ function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
-            Dashboard
+            {t('title')}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Compliance monitoring overview
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('subtitle')}</p>
         </div>
         {/* Live indicator */}
         {isConnected && (
@@ -129,7 +129,7 @@ function DashboardPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
             </span>
-            Live
+            {t('live')}
           </span>
         )}
       </div>
@@ -152,7 +152,7 @@ function DashboardPage() {
           {preferences.preferredComplianceAreas.length > 0 && (
             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                Preferred Compliance Areas
+                {t('sections.preferredAreas')}
               </h3>
               <div className="flex flex-wrap gap-2">
                 {preferences.preferredComplianceAreas.map((area) => (
@@ -171,7 +171,7 @@ function DashboardPage() {
           {preferences.topFeatures.length > 0 && (
             <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-                Your Top Features
+                {t('sections.topFeatures')}
               </h3>
               <div className="space-y-2">
                 {preferences.topFeatures.slice(0, 5).map((feature) => (

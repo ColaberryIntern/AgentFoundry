@@ -50,3 +50,95 @@
     transform: scale(1.05);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Reduced Motion                                                     */
+/* Users who prefer reduced motion get no animations or transitions.  */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-slide-in,
+  .animate-fade-in-down,
+  .animate-spin,
+  .animate-ping {
+    animation: none !important;
+  }
+
+  .metric-value-transition {
+    transition: none !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* High Contrast                                                      */
+/* Increases border widths, text weight and focus ring visibility.     */
+/* ------------------------------------------------------------------ */
+@media (prefers-contrast: high) {
+  :root {
+    --focus-ring-width: 3px;
+    --focus-ring-color: #000;
+    --border-width: 2px;
+  }
+
+  /* Thicker borders */
+  [class*="border"] {
+    border-width: var(--border-width, 2px);
+  }
+
+  /* Stronger focus indicators */
+  :focus-visible {
+    outline: var(--focus-ring-width, 3px) solid var(--focus-ring-color, #000) !important;
+    outline-offset: 2px;
+  }
+
+  /* Ensure text meets higher contrast thresholds */
+  body {
+    font-weight: 500;
+  }
+
+  /* Dark mode high contrast overrides */
+  .dark {
+    --focus-ring-color: #fff;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* RTL Support Foundation                                             */
+/* Logical properties for directional layout.                         */
+/* ------------------------------------------------------------------ */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .container {
+  margin-inline-start: auto;
+  margin-inline-end: auto;
+}
+
+/* Convert common directional utilities to logical equivalents */
+[dir="rtl"] .ml-auto { margin-inline-start: auto; margin-left: unset; }
+[dir="rtl"] .mr-auto { margin-inline-end: auto; margin-right: unset; }
+[dir="rtl"] .pl-4 { padding-inline-start: 1rem; padding-left: unset; }
+[dir="rtl"] .pr-4 { padding-inline-end: 1rem; padding-right: unset; }
+[dir="rtl"] .ml-2 { margin-inline-start: 0.5rem; margin-left: unset; }
+[dir="rtl"] .mr-2 { margin-inline-end: 0.5rem; margin-right: unset; }
+[dir="rtl"] .ml-1 { margin-inline-start: 0.25rem; margin-left: unset; }
+[dir="rtl"] .mr-1 { margin-inline-end: 0.25rem; margin-right: unset; }
+[dir="rtl"] .text-left { text-align: start; }
+[dir="rtl"] .text-right { text-align: end; }
+
+/* Flip absolute positioned elements */
+[dir="rtl"] .left-0 { left: unset; right: 0; }
+[dir="rtl"] .right-0 { right: unset; left: 0; }
+
+/* Flex direction remains the same — CSS flex handles RTL automatically
+   when direction: rtl is set on the parent */

@@ -11,7 +11,12 @@ function ThemeToggle() {
     setTheme(THEMES[nextIndex]);
   };
 
-  const label = theme === 'light' ? 'Light mode' : theme === 'dark' ? 'Dark mode' : 'System theme';
+  const label =
+    theme === 'light'
+      ? 'Switch to dark mode'
+      : theme === 'dark'
+        ? 'Switch to system theme'
+        : 'Switch to light mode';
 
   return (
     <button

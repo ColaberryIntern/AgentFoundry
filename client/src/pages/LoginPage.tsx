@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loginUser, clearError } from '../store/authSlice';
 
 function LoginPage() {
+  const { t } = useTranslation('auth');
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { isLoading, error } = useAppSelector((state) => state.auth);
@@ -25,11 +27,15 @@ function LoginPage() {
     <div className="flex items-center justify-center min-h-[80vh]">
       <div className="w-full max-w-md">
         <h1 className="text-3xl font-bold text-center mb-8 text-primary-700 dark:text-primary-400">
-          Sign In
+          {t('login.title')}
         </h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-700 dark:text-red-400 text-sm">
+          <div
+            id="login-error"
+            role="alert"
+            className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-red-700 dark:text-red-400 text-sm"
+          >
             {error}
           </div>
         )}
@@ -40,7 +46,7 @@ function LoginPage() {
               htmlFor="email"
               className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300"
             >
-              Email
+              {t('login.email')}
             </label>
             <input
               id="email"
@@ -48,8 +54,10 @@ function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              aria-invalid={!!error}
+              aria-describedby={error ? 'login-error' : undefined}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              placeholder="you@company.com"
+              placeholder={t('login.emailPlaceholder')}
             />
           </div>
 
@@ -58,7 +66,7 @@ function LoginPage() {
               htmlFor="password"
               className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300"
             >
-              Password
+              {t('login.password')}
             </label>
             <input
               id="password"
@@ -66,6 +74,8 @@ function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              aria-invalid={!!error}
+              aria-describedby={error ? 'login-error' : undefined}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -75,17 +85,17 @@ function LoginPage() {
             disabled={isLoading}
             className="w-full py-2 px-4 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
           >
-            {isLoading ? 'Signing In...' : 'Sign In'}
+            {isLoading ? t('login.submitting') : t('login.submit')}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-          Don&apos;t have an account?{' '}
+          {t('login.noAccount')}{' '}
           <Link
             to="/register"
             className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
           >
-            Create one
+            {t('login.createOne')}
           </Link>
         </p>
       </div>

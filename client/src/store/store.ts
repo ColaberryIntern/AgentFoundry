@@ -10,6 +10,8 @@ import templatesReducer from './templatesSlice';
 import schedulesReducer from './schedulesSlice';
 import recommendationsReducer from './recommendationsSlice';
 import adaptiveReducer from './adaptiveSlice';
+import agentsReducer from './agentsSlice';
+import complianceReducer from './complianceSlice';
 
 export const store = configureStore({
   reducer: {
@@ -24,6 +26,8 @@ export const store = configureStore({
     schedules: schedulesReducer,
     recommendations: recommendationsReducer,
     adaptive: adaptiveReducer,
+    agents: agentsReducer,
+    compliance: complianceReducer,
   },
 });
 

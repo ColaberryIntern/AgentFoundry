@@ -1,0 +1,16 @@
+{
+  "home": "Home",
+  "dashboard": "Dashboard",
+  "reports": "Reports",
+  "customReports": "Custom Reports",
+  "webhooks": "Webhooks",
+  "recommendations": "AI Recommendations",
+  "manageRoles": "Manage Roles",
+  "notifications": "Notifications",
+  "search": "Search",
+  "signIn": "Sign In",
+  "getStarted": "Get Started",
+  "searchShortcut": "Ctrl+K",
+  "toggleMenu": "Toggle menu",
+  "mainNavigation": "Main navigation"
+}
