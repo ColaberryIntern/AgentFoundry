@@ -151,161 +151,84 @@ const REPORTING_SERVICE_URL = process.env.REPORTING_SERVICE_URL || 'http://local
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:3004';
 const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3005';
 
+// ---------------------------------------------------------------------------
+// Proxy helper: Express strips the mount path from req.url, so we need to
+// prepend it back before forwarding to downstream services.
+// ---------------------------------------------------------------------------
+const proxyOptions = (mountPath: string, target: string) => ({
+  target,
+  changeOrigin: true,
+  pathRewrite: (path: string) => `${mountPath}${path}`,
+  on: { proxyReq: fixRequestBody },
+});
+
 // Sprint 1-2: User Service proxy (auth, roles, API keys)
-app.use(
-  '/api/users',
-  createProxyMiddleware({
-    target: USER_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/users': '/api/users' },
-    on: { proxyReq: fixRequestBody },
-  }),
-);
+app.use('/api/users', createProxyMiddleware(proxyOptions('/api/users', USER_SERVICE_URL)));
 
 // Sprint 2: Roles proxy → User Service
-app.use(
-  '/api/roles',
-  createProxyMiddleware({
-    target: USER_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/roles': '/api/roles' },
-    on: { proxyReq: fixRequestBody },
-  }),
-);
+app.use('/api/roles', createProxyMiddleware(proxyOptions('/api/roles', USER_SERVICE_URL)));
 
 // Sprint 2: API Keys proxy → User Service
-app.use(
-  '/api/keys',
-  createProxyMiddleware({
-    target: USER_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/keys': '/api/keys' },
-    on: { proxyReq: fixRequestBody },
-  }),
-);
+app.use('/api/keys', createProxyMiddleware(proxyOptions('/api/keys', USER_SERVICE_URL)));
 
 // Sprint 3: Compliance Service proxy
 app.use(
   '/api/compliance',
-  createProxyMiddleware({
-    target: COMPLIANCE_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/compliance': '/api/compliance' },
-    on: { proxyReq: fixRequestBody },
-  }),
+  createProxyMiddleware(proxyOptions('/api/compliance', COMPLIANCE_SERVICE_URL)),
 );
 
 // Sprint 21: Agent Management proxy → Compliance Service
-app.use(
-  '/api/agents',
-  createProxyMiddleware({
-    target: COMPLIANCE_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/agents': '/api/agents' },
-    on: { proxyReq: fixRequestBody },
-  }),
-);
+app.use('/api/agents', createProxyMiddleware(proxyOptions('/api/agents', COMPLIANCE_SERVICE_URL)));
 
 // Sprint 3: Dashboard proxy → Compliance Service (cached 30s)
 app.use(
   '/api/dashboard',
   cacheResponse('dashboard', 30),
-  createProxyMiddleware({
-    target: COMPLIANCE_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/dashboard': '/api/dashboard' },
-    on: { proxyReq: fixRequestBody },
-  }),
+  createProxyMiddleware(proxyOptions('/api/dashboard', COMPLIANCE_SERVICE_URL)),
 );
 
 // Sprint 4: Reporting Service proxy
-app.use(
-  '/api/reports',
-  createProxyMiddleware({
-    target: REPORTING_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/reports': '/api/reports' },
-    on: { proxyReq: fixRequestBody },
-  }),
-);
+app.use('/api/reports', createProxyMiddleware(proxyOptions('/api/reports', REPORTING_SERVICE_URL)));
 
 // Sprint 4: Notification Service proxy
 app.use(
   '/api/notifications',
-  createProxyMiddleware({
-    target: NOTIFICATION_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/notifications': '/api/notifications' },
-    on: { proxyReq: fixRequestBody },
-  }),
+  createProxyMiddleware(proxyOptions('/api/notifications', NOTIFICATION_SERVICE_URL)),
 );
 
 // Sprint 10: Webhooks proxy → Notification Service
 app.use(
   '/api/webhooks',
-  createProxyMiddleware({
-    target: NOTIFICATION_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/webhooks': '/api/webhooks' },
-    on: { proxyReq: fixRequestBody },
-  }),
+  createProxyMiddleware(proxyOptions('/api/webhooks', NOTIFICATION_SERVICE_URL)),
 );
 
 // Sprint 13: AI Recommendation Service proxy
 app.use(
   '/api/recommendations',
-  createProxyMiddleware({
-    target: AI_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/recommendations': '/api/recommendations' },
-    on: { proxyReq: fixRequestBody },
-  }),
+  createProxyMiddleware(proxyOptions('/api/recommendations', AI_SERVICE_URL)),
 );
 
 // Sprint 13: AI Inference proxy → AI Recommendation Service (health cached 60s)
 app.use(
   '/api/inference',
   cacheResponse('inference', 60),
-  createProxyMiddleware({
-    target: AI_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/inference': '/api/inference' },
-    on: { proxyReq: fixRequestBody },
-  }),
+  createProxyMiddleware(proxyOptions('/api/inference', AI_SERVICE_URL)),
 );
 
 // Sprint 13: AI Models proxy → AI Recommendation Service
-app.use(
-  '/api/models',
-  createProxyMiddleware({
-    target: AI_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/models': '/api/models' },
-    on: { proxyReq: fixRequestBody },
-  }),
-);
+app.use('/api/models', createProxyMiddleware(proxyOptions('/api/models', AI_SERVICE_URL)));
 
 // Sprint 14: User Interactions proxy → AI Recommendation Service
 app.use(
   '/api/interactions',
-  createProxyMiddleware({
-    target: AI_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/interactions': '/api/interactions' },
-    on: { proxyReq: fixRequestBody },
-  }),
+  createProxyMiddleware(proxyOptions('/api/interactions', AI_SERVICE_URL)),
 );
 
 // Sprint 14: Adaptive Preferences proxy → AI Recommendation Service (cached 1 hour)
 app.use(
   '/api/adaptive',
   cacheResponse('adaptive', 3600),
-  createProxyMiddleware({
-    target: AI_SERVICE_URL,
-    changeOrigin: true,
-    pathRewrite: { '^/api/adaptive': '/api/adaptive' },
-    on: { proxyReq: fixRequestBody },
-  }),
+  createProxyMiddleware(proxyOptions('/api/adaptive', AI_SERVICE_URL)),
 );
 
 // ---------------------------------------------------------------------------
