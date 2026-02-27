@@ -4,7 +4,12 @@ import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import healthRouter from './routes/health';
+import recommendationsRouter from './routes/recommendations';
+import modelsRouter from './routes/models';
+import inferenceRouter from './routes/inference';
 import { errorHandler } from './middleware/errorHandler';
+import { initModels } from './models';
+import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
 
 dotenv.config();
 
@@ -14,16 +19,36 @@ const PORT = parseInt(process.env.AI_SERVICE_PORT || '3004', 10);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(morgan('combined'));
+
+// Metrics endpoint — before auth-protected routes
+app.get('/metrics', metricsEndpoint);
+app.use(metricsMiddleware);
+
+// Disable request logging during tests to keep output clean
+if (process.env.NODE_ENV !== 'test') {
+  app.use(morgan('combined'));
+}
 
 app.use('/health', healthRouter);
+app.use('/api/recommendations', recommendationsRouter);
+app.use('/api/models', modelsRouter);
+app.use('/api/inference', inferenceRouter);
 
 app.use(errorHandler);
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`AI Recommendation Service listening on port ${PORT}`);
-  });
+  initModels()
+    .then(() => {
+      app.listen(PORT, () => {
+        // eslint-disable-next-line no-console
+        console.log(`AI Recommendation Service listening on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to initialize database:', err);
+      process.exit(1);
+    });
 }
 
 export default app;

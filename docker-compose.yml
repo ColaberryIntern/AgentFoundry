@@ -167,6 +167,7 @@ services:
     environment:
       <<: *common-env
       PORT: "3004"
+      MODEL_SERVER_URL: http://model-server:8000
     depends_on:
       postgres:
         condition: service_healthy
@@ -195,6 +196,25 @@ services:
     networks:
       - agent-foundry-network
 
+  model-server:
+    build:
+      context: ./services/model-server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *common-env
+      PORT: "8000"
+      MODEL_DIR: "/app/models"
+      DATA_DIR: "/app/data"
+    volumes:
+      - model_data:/app/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - agent-foundry-network
+
   client:
     build:
       context: .
@@ -219,3 +239,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  model_data:
