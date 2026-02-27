@@ -9,6 +9,7 @@ import webhooksReducer from './webhooksSlice';
 import templatesReducer from './templatesSlice';
 import schedulesReducer from './schedulesSlice';
 import recommendationsReducer from './recommendationsSlice';
+import adaptiveReducer from './adaptiveSlice';
 
 export const store = configureStore({
   reducer: {
@@ -22,6 +23,7 @@ export const store = configureStore({
     templates: templatesReducer,
     schedules: schedulesReducer,
     recommendations: recommendationsReducer,
+    adaptive: adaptiveReducer,
   },
 });
 

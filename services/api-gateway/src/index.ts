@@ -196,6 +196,26 @@ app.use(
   }),
 );
 
+// Sprint 14: User Interactions proxy → AI Recommendation Service
+app.use(
+  '/api/interactions',
+  createProxyMiddleware({
+    target: AI_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/api/interactions': '/api/interactions' },
+  }),
+);
+
+// Sprint 14: Adaptive Preferences proxy → AI Recommendation Service
+app.use(
+  '/api/adaptive',
+  createProxyMiddleware({
+    target: AI_SERVICE_URL,
+    changeOrigin: true,
+    pathRewrite: { '^/api/adaptive': '/api/adaptive' },
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Error handling — must be last
 // ---------------------------------------------------------------------------
@@ -212,10 +232,12 @@ if (process.env.NODE_ENV !== 'test') {
   initModels()
     .then(() => {
       server = app.listen(PORT, () => {
+        // eslint-disable-next-line no-console
         console.log(`[api-gateway] listening on port ${PORT}`);
       });
     })
     .catch((err) => {
+      // eslint-disable-next-line no-console
       console.error('[api-gateway] Failed to initialize database:', err);
       process.exit(1);
     });

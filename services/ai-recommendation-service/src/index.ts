@@ -7,6 +7,8 @@ import healthRouter from './routes/health';
 import recommendationsRouter from './routes/recommendations';
 import modelsRouter from './routes/models';
 import inferenceRouter from './routes/inference';
+import interactionsRouter from './routes/interactions';
+import adaptiveRouter from './routes/adaptive';
 import { errorHandler } from './middleware/errorHandler';
 import { initModels } from './models';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
@@ -33,6 +35,8 @@ app.use('/health', healthRouter);
 app.use('/api/recommendations', recommendationsRouter);
 app.use('/api/models', modelsRouter);
 app.use('/api/inference', inferenceRouter);
+app.use('/api/interactions', interactionsRouter);
+app.use('/api/adaptive', adaptiveRouter);
 
 app.use(errorHandler);
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { search, suggestions, getSearchHistory } from '../controllers/searchController';
+import { naturalLanguageSearch } from '../controllers/nlSearchController';
 
 const router = Router();
 
@@ -24,5 +25,13 @@ router.get('/suggestions', authenticate, suggestions);
  * Requires authentication.
  */
 router.get('/history', authenticate, getSearchHistory);
+
+/**
+ * POST /api/search/natural
+ * Natural language search — classifies intent, extracts entities,
+ * and returns structured search results with interpretation.
+ * Requires authentication.
+ */
+router.post('/natural', authenticate, naturalLanguageSearch);
 
 export default router;

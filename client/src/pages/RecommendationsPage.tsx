@@ -3,6 +3,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchInferenceHealth } from '../store/recommendationsSlice';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useInteractionTracking } from '../hooks/useInteractionTracking';
 import RecommendationsPanel from '../components/recommendations/RecommendationsPanel';
 
 function RecommendationsPage() {
@@ -10,6 +11,7 @@ function RecommendationsPage() {
   const { user } = useAppSelector((state) => state.auth);
   const { inferenceHealth } = useAppSelector((state) => state.recommendations);
   const { trackPageView } = useAnalytics();
+  useInteractionTracking('recommendations');
 
   useEffect(() => {
     trackPageView('recommendations');

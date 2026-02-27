@@ -3,21 +3,32 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchSuggestions } from '../store/searchSlice';
+import { performNLSearch, clearNLSearchResult } from '../store/adaptiveSlice';
 
 interface GlobalSearchProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+const ENTITY_COLOR_MAP: Record<string, string> = {
+  type: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  status: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  date: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+  regulation: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  keyword: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+};
+
 function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { suggestions } = useAppSelector((state) => state.search);
+  const { nlSearchResult, nlSearchLoading } = useAppSelector((state) => state.adaptive);
 
   const [inputValue, setInputValue] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isVisible, setIsVisible] = useState(false);
+  const [nlMode, setNlMode] = useState(true);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -29,6 +40,7 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       setIsVisible(true);
       setInputValue('');
       setSelectedIndex(-1);
+      dispatch(clearNLSearchResult());
       // Focus input after render
       requestAnimationFrame(() => {
         inputRef.current?.focus();
@@ -36,7 +48,7 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     } else {
       setIsVisible(false);
     }
-  }, [isOpen]);
+  }, [isOpen, dispatch]);
 
   // Close on route change
   useEffect(() => {
@@ -59,11 +71,11 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     return () => document.removeEventListener('keydown', handleGlobalKeydown);
   }, [isOpen, onClose]);
 
-  // Debounced suggestions
+  // Debounced suggestions (only in standard mode)
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    if (inputValue.trim().length < 2) {
+    if (inputValue.trim().length < 2 || nlMode) {
       return;
     }
 
@@ -75,19 +87,34 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [inputValue, dispatch]);
+  }, [inputValue, dispatch, nlMode]);
 
   const navigateToSearch = useCallback(
     (query: string) => {
       if (!query.trim()) return;
-      onClose();
-      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+      if (nlMode) {
+        onClose();
+        navigate(`/search?q=${encodeURIComponent(query.trim())}&mode=nl`);
+      } else {
+        onClose();
+        navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+      }
     },
-    [navigate, onClose],
+    [navigate, onClose, nlMode],
   );
 
+  const handleSubmit = useCallback(() => {
+    const query = inputValue.trim();
+    if (!query) return;
+
+    if (nlMode) {
+      dispatch(performNLSearch(query));
+    }
+    navigateToSearch(query);
+  }, [inputValue, nlMode, dispatch, navigateToSearch]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const visibleSuggestions = inputValue.trim().length >= 2 ? suggestions : [];
+    const visibleSuggestions = !nlMode && inputValue.trim().length >= 2 ? suggestions : [];
 
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -107,7 +134,7 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
       if (selectedIndex >= 0 && visibleSuggestions[selectedIndex]) {
         navigateToSearch(visibleSuggestions[selectedIndex]);
       } else {
-        navigateToSearch(inputValue);
+        handleSubmit();
       }
     }
   };
@@ -120,7 +147,7 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
   if (!isOpen) return null;
 
-  const visibleSuggestions = inputValue.trim().length >= 2 ? suggestions : [];
+  const visibleSuggestions = !nlMode && inputValue.trim().length >= 2 ? suggestions : [];
 
   const modal = (
     <div
@@ -160,15 +187,109 @@ function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search compliance records, reports..."
+            placeholder={
+              nlMode
+                ? 'Ask in natural language, e.g. "show me failed compliance reports"'
+                : 'Search compliance records, reports...'
+            }
             className="flex-1 px-3 py-4 bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none text-base"
           />
-          <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+          {/* NL Mode Toggle */}
+          <button
+            type="button"
+            onClick={() => setNlMode((prev) => !prev)}
+            className={`flex-shrink-0 ml-2 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+              nlMode
+                ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+            }`}
+            title={nlMode ? 'Natural Language mode active' : 'Standard search mode'}
+          >
+            {nlMode ? 'NL' : 'Std'}
+          </button>
+          <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 ml-2 text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
             Esc
           </kbd>
         </div>
 
-        {/* Suggestions */}
+        {/* NL Mode indicator */}
+        {nlMode && (
+          <div className="px-4 py-2 bg-primary-50 dark:bg-primary-900/10 border-b border-primary-100 dark:border-primary-800/30">
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-4 h-4 text-primary-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              <span className="text-xs text-primary-700 dark:text-primary-400">
+                Natural Language search is active — type your query in plain English
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* NL Search loading indicator */}
+        {nlSearchLoading && (
+          <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-200 dark:border-gray-700">
+            <div className="w-4 h-4 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Interpreting your query...
+            </span>
+          </div>
+        )}
+
+        {/* NL Search result preview */}
+        {nlMode && nlSearchResult && !nlSearchLoading && (
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 space-y-2">
+            {/* Interpretation */}
+            <p className="text-sm text-gray-700 dark:text-gray-300 italic">
+              {nlSearchResult.interpretation}
+            </p>
+
+            {/* Intent + Confidence */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
+                {nlSearchResult.intent}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {Math.round(nlSearchResult.confidence * 100)}% confidence
+              </span>
+            </div>
+
+            {/* Entities */}
+            {nlSearchResult.entities.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {nlSearchResult.entities.map((entity, idx) => (
+                  <span
+                    key={`${entity.type}-${idx}`}
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      ENTITY_COLOR_MAP[entity.type] || ENTITY_COLOR_MAP.keyword
+                    }`}
+                  >
+                    <span className="opacity-60 mr-1">{entity.type}:</span>
+                    {entity.value}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Result count */}
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {nlSearchResult.results.length} result
+              {nlSearchResult.results.length !== 1 ? 's' : ''} found — press Enter to view
+            </p>
+          </div>
+        )}
+
+        {/* Standard Suggestions */}
         {visibleSuggestions.length > 0 && (
           <div className="max-h-64 overflow-y-auto py-2">
             {visibleSuggestions.map((suggestion, idx) => (

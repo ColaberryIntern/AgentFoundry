@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useCallback } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { fetchDashboard } from '../store/dashboardSlice';
 import {
@@ -7,14 +7,11 @@ import {
   fetchInferenceHealth,
   submitFeedback,
 } from '../store/recommendationsSlice';
+import { fetchAdaptivePreferences } from '../store/adaptiveSlice';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useInteractionTracking } from '../hooks/useInteractionTracking';
 import { useDashboardWebSocket } from '../hooks/useDashboardWebSocket';
-import MetricsCards from '../components/dashboard/MetricsCards';
-import ComplianceOverview from '../components/dashboard/ComplianceOverview';
-import ComplianceTrend from '../components/dashboard/ComplianceTrend';
-import RecentActivity from '../components/dashboard/RecentActivity';
-import LiveActivityFeed from '../components/dashboard/LiveActivityFeed';
-import RecommendationCard from '../components/recommendations/RecommendationCard';
+import AdaptiveDashboard from '../components/dashboard/AdaptiveDashboard';
 import type { FeedbackAction } from '../types/recommendations';
 
 function DashboardPage() {
@@ -22,7 +19,9 @@ function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth);
   const { dashboard, isLoading, error } = useAppSelector((state) => state.dashboard);
   const { recommendations, inferenceHealth } = useAppSelector((state) => state.recommendations);
+  const { preferences } = useAppSelector((state) => state.adaptive);
   const { trackPageView } = useAnalytics();
+  const { trackWidgetClick, trackRecommendationClick } = useInteractionTracking('dashboard');
   const { isConnected, latestMetrics, latestActivity } = useDashboardWebSocket();
 
   useEffect(() => {
@@ -40,14 +39,23 @@ function DashboardPage() {
         }),
       );
       dispatch(fetchInferenceHealth());
+      dispatch(fetchAdaptivePreferences(String(user.id)));
     }
   }, [dispatch, user]);
 
   const handleRecommendationFeedback = useCallback(
     (recommendationId: string, action: FeedbackAction) => {
+      trackRecommendationClick(recommendationId);
       dispatch(submitFeedback({ recommendationId, action }));
     },
-    [dispatch],
+    [dispatch, trackRecommendationClick],
+  );
+
+  const handleWidgetClick = useCallback(
+    (widgetName: string) => {
+      trackWidgetClick(widgetName);
+    },
+    [trackWidgetClick],
   );
 
   // Merge WebSocket metrics with dashboard data for real-time updates
@@ -126,88 +134,67 @@ function DashboardPage() {
         )}
       </div>
 
-      {/* KPI Metrics Row */}
-      <MetricsCards dashboard={liveDashboard} />
+      {/* Adaptive Dashboard renders widgets in personalized order */}
+      <AdaptiveDashboard
+        dashboard={liveDashboard}
+        recommendations={recommendations}
+        inferenceHealth={inferenceHealth}
+        latestActivity={latestActivity}
+        isConnected={isConnected}
+        onRecommendationFeedback={handleRecommendationFeedback}
+        onWidgetClick={handleWidgetClick}
+      />
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ComplianceOverview records={liveDashboard.recentUpdates} />
-        <ComplianceTrend trend={liveDashboard.trend} />
-      </div>
+      {/* Preferred compliance areas & Top features sidebar */}
+      {preferences && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Preferred Compliance Areas */}
+          {preferences.preferredComplianceAreas.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Preferred Compliance Areas
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {preferences.preferredComplianceAreas.map((area) => (
+                  <span
+                    key={area}
+                    className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+                  >
+                    {area}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Live Activity Feed + Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <LiveActivityFeed latestActivity={latestActivity} isConnected={isConnected} />
-        <RecentActivity records={liveDashboard.recentUpdates} />
-      </div>
-
-      {/* AI Recommendations Section */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              AI Recommendations
-            </h2>
-            {/* AI Service health indicator */}
-            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  inferenceHealth?.status === 'healthy'
-                    ? 'bg-green-500'
-                    : inferenceHealth?.status === 'degraded'
-                      ? 'bg-yellow-500'
-                      : 'bg-red-500'
-                }`}
-              />
-              <span className="text-gray-600 dark:text-gray-400">
-                {inferenceHealth?.status === 'healthy'
-                  ? 'Online'
-                  : inferenceHealth?.status === 'degraded'
-                    ? 'Degraded'
-                    : 'Offline'}
-              </span>
-            </span>
-          </div>
-          <Link
-            to="/recommendations"
-            className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
-          >
-            View All &rarr;
-          </Link>
+          {/* Top Features */}
+          {preferences.topFeatures.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Your Top Features
+              </h3>
+              <div className="space-y-2">
+                {preferences.topFeatures.slice(0, 5).map((feature) => (
+                  <div key={feature.name} className="flex items-center gap-3">
+                    <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">
+                      {feature.name}
+                    </span>
+                    <div className="w-24 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary-500 rounded-full"
+                        style={{ width: `${Math.min(feature.score * 100, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 w-8 text-right">
+                      {Math.round(feature.score * 100)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-
-        {recommendations.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {recommendations.slice(0, 5).map((rec) => (
-              <RecommendationCard
-                key={rec.id}
-                recommendation={rec}
-                onFeedback={handleRecommendationFeedback}
-                compact
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <svg
-              className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-              />
-            </svg>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              No active recommendations at this time.
-            </p>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

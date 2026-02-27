@@ -1,6 +1,7 @@
 import { sequelize } from '../config/database';
 import { Recommendation } from './Recommendation';
 import { ModelRegistry } from './ModelRegistry';
+import { UserInteraction } from './UserInteraction';
 
 // Associations
 ModelRegistry.hasMany(Recommendation, {
@@ -21,4 +22,4 @@ async function initModels(options?: { force?: boolean }): Promise<void> {
   await sequelize.sync(options);
 }
 
-export { sequelize, Recommendation, ModelRegistry, initModels };
+export { sequelize, Recommendation, ModelRegistry, UserInteraction, initModels };
