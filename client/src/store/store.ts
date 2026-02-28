@@ -12,6 +12,7 @@ import recommendationsReducer from './recommendationsSlice';
 import adaptiveReducer from './adaptiveSlice';
 import agentsReducer from './agentsSlice';
 import complianceReducer from './complianceSlice';
+import registryReducer from './registrySlice';
 
 export const store = configureStore({
   reducer: {
@@ -28,6 +29,7 @@ export const store = configureStore({
     adaptive: adaptiveReducer,
     agents: agentsReducer,
     compliance: complianceReducer,
+    registry: registryReducer,
   },
 });
 

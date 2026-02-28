@@ -12,6 +12,18 @@ const REGULATIONS = [
   { id: 'CCPA-2018', type: 'CCPA', source: 'privacy-audit' },
   { id: 'NIST-CSF-2.0', type: 'NIST', source: 'framework-assessment' },
   { id: 'SOC2-Type2', type: 'SOC2', source: 'vendor-audit' },
+  { id: 'LGPD-2018', type: 'LGPD', source: 'brazil-privacy-audit' },
+  { id: 'PIPEDA-2000', type: 'PIPEDA', source: 'canada-privacy-scan' },
+  { id: 'FERPA-1974', type: 'FERPA', source: 'education-data-audit' },
+  { id: 'GLBA-1999', type: 'GLBA', source: 'financial-privacy-scan' },
+  { id: 'DORA-2022', type: 'DORA', source: 'operational-resilience-audit' },
+  { id: 'FISMA-2014', type: 'FISMA', source: 'federal-security-assessment' },
+  { id: 'FedRAMP-2011', type: 'FedRAMP', source: 'cloud-security-assessment' },
+  { id: 'NERC-CIP-014', type: 'NERC-CIP', source: 'critical-infrastructure-scan' },
+  { id: 'FDA-21-CFR-11', type: 'FDA-21-CFR', source: 'electronic-records-audit' },
+  { id: 'Basel-III-2010', type: 'Basel-III', source: 'capital-adequacy-review' },
+  { id: 'MiFID-II-2018', type: 'MiFID-II', source: 'trading-compliance-scan' },
+  { id: 'COPPA-1998', type: 'COPPA', source: 'child-privacy-audit' },
 ];
 
 const STATUS_WEIGHTS: Array<[string, number]> = [

@@ -1,2 +1,12 @@
 export { default as ComplianceRecord } from './ComplianceRecord';
 export { default as ComplianceCalendar } from './ComplianceCalendar';
+export { default as NaicsIndustry } from './NaicsIndustry';
+export { default as TaxonomyNode } from './TaxonomyNode';
+export { default as OntologyRelationship } from './OntologyRelationship';
+export { default as UseCase } from './UseCase';
+export { default as AgentSkeleton } from './AgentSkeleton';
+export { default as AgentVariant } from './AgentVariant';
+export { default as DeploymentInstance } from './DeploymentInstance';
+export { default as CertificationRecord } from './CertificationRecord';
+export { default as RegistryAuditLog } from './RegistryAuditLog';
+export { default as SystemIntelligence } from './SystemIntelligence';

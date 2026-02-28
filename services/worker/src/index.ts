@@ -12,6 +12,16 @@ import { runNotificationDispatcher } from './jobs/notificationDispatcher';
 import { runRecommendationGenerator } from './jobs/recommendationGenerator';
 import { runCalendarManager } from './jobs/calendarManager';
 import { runReportScheduler } from './jobs/reportScheduler';
+import { runIndustrySeeder } from './jobs/industrySeeder';
+import { runTaxonomySeeder } from './jobs/taxonomySeeder';
+import {
+  runNaicsUpdateAgent,
+  runRegulatoryChangeAgent,
+  runTaxonomyGapAgent,
+  runOntologyIntegrityAgent,
+  runPerformanceDriftAgent,
+  runUseCaseReplicationAgent,
+} from './jobs/registryAgents';
 
 // ---------------------------------------------------------------------------
 // Wrap job execution with error handling and logging
@@ -41,7 +51,11 @@ async function main(): Promise<void> {
 
   logger.info('Running initial seed jobs...');
 
-  // Run seed-capable jobs immediately so dashboard has data on startup
+  // Phase 1: Seed NAICS industries + taxonomy (must run before other jobs)
+  await runJob('industrySeeder', runIndustrySeeder);
+  await runJob('taxonomySeeder', runTaxonomySeeder);
+
+  // Phase 2: Run existing seed-capable jobs
   await runJob('agentManager', runAgentManager);
   await runJob('calendarManager', runCalendarManager);
   await runJob('reportScheduler', runReportScheduler);
@@ -85,18 +99,61 @@ async function main(): Promise<void> {
     runJob('calendarManager', runCalendarManager);
   });
 
+  // -------------------------------------------------------------------------
+  // Registry background agents
+  // -------------------------------------------------------------------------
+
+  // Performance drift agent — every 30 minutes
+  cron.schedule('*/30 * * * *', () => {
+    runJob('performanceDriftAgent', runPerformanceDriftAgent);
+  });
+
+  // Regulatory change agent — daily at 2 AM
+  cron.schedule('0 2 * * *', () => {
+    runJob('regulatoryChangeAgent', runRegulatoryChangeAgent);
+  });
+
+  // Ontology integrity agent — nightly at 4 AM
+  cron.schedule('0 4 * * *', () => {
+    runJob('ontologyIntegrityAgent', runOntologyIntegrityAgent);
+  });
+
+  // Taxonomy gap agent — weekly on Monday at 3 AM
+  cron.schedule('0 3 * * 1', () => {
+    runJob('taxonomyGapAgent', runTaxonomyGapAgent);
+  });
+
+  // Use case replication agent — weekly on Monday at 5 AM
+  cron.schedule('0 5 * * 1', () => {
+    runJob('useCaseReplicationAgent', runUseCaseReplicationAgent);
+  });
+
+  // NAICS update agent — quarterly (1st of Jan, Apr, Jul, Oct)
+  cron.schedule('0 0 1 1,4,7,10 *', () => {
+    runJob('naicsUpdateAgent', runNaicsUpdateAgent);
+  });
+
   logger.info(
     [
       '',
-      'Agent Foundry Worker v1.0.0',
+      'Agent Foundry Worker v2.0.0',
       '==========================================',
       'Scheduled jobs:',
-      '  Agent Manager:          every 5 min',
+      '  Agent Manager:           every 5 min',
       '  Notification Dispatcher: every 10 min',
-      '  Compliance Checker:     every 15 min',
-      '  Recommendation Engine:  every 30 min',
-      '  Report Scheduler:       every hour',
-      '  Calendar Manager:       daily at midnight',
+      '  Compliance Checker:      every 15 min',
+      '  Recommendation Engine:   every 30 min',
+      '  Performance Drift Agent: every 30 min',
+      '  Report Scheduler:        every hour',
+      '  Regulatory Change Agent: daily at 2 AM',
+      '  Ontology Integrity:      nightly at 4 AM',
+      '  Calendar Manager:        daily at midnight',
+      '  Taxonomy Gap Agent:      weekly (Mon 3 AM)',
+      '  Use Case Replication:    weekly (Mon 5 AM)',
+      '  NAICS Update Agent:      quarterly',
+      '==========================================',
+      '  NAICS industries seeded: 24 sectors',
+      '  Registry agents active:  12 total',
       '==========================================',
       '',
     ].join('\n'),

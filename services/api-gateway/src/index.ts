@@ -231,6 +231,13 @@ app.use(
   createProxyMiddleware(proxyOptions('/api/adaptive', AI_SERVICE_URL)),
 );
 
+// Sprint 12: Registry proxy → Compliance Service (cached 5 min)
+app.use(
+  '/api/registry',
+  cacheResponse('registry', 300),
+  createProxyMiddleware(proxyOptions('/api/registry', COMPLIANCE_SERVICE_URL)),
+);
+
 // ---------------------------------------------------------------------------
 // API version prefix routing: /api/v1/* → /api/*
 // ---------------------------------------------------------------------------

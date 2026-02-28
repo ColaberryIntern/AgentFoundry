@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchMarketSignals } from '../../store/complianceSlice';
+import { fetchIndustries } from '../../store/registrySlice';
 
 ChartJS.register(
   CategoryScale,
@@ -25,7 +26,8 @@ ChartJS.register(
   Filler,
 );
 
-const INDUSTRIES = [
+// Fallback industries while NAICS data loads
+const FALLBACK_INDUSTRIES = [
   'Healthcare',
   'Finance',
   'Technology',
@@ -74,8 +76,25 @@ function MarketSignals() {
   const { marketSignals, marketSignalsLoading, error } = useAppSelector(
     (state) => state.compliance,
   );
+  const { industries } = useAppSelector((state) => state.registry);
   const [selectedIndustry, setSelectedIndustry] = useState('Finance');
   const chartRef = useRef<ChartJS<'line'>>(null);
+
+  // Load NAICS sectors on mount
+  useEffect(() => {
+    if (industries.length === 0) {
+      dispatch(fetchIndustries({ level: 2, limit: 100 }));
+    }
+  }, [dispatch, industries.length]);
+
+  // Build industry list from NAICS sectors (grouped by sector range)
+  const industryOptions =
+    industries.length > 0
+      ? industries.map((ind) => ({
+          value: ind.title.replace(/\s*\(\d+\)$/, ''),
+          label: `${ind.code} - ${ind.title}`,
+        }))
+      : FALLBACK_INDUSTRIES.map((name) => ({ value: name, label: name }));
 
   // Determine overall trend from last few signals
   const overallTrend = (() => {
@@ -188,9 +207,9 @@ function MarketSignals() {
             onChange={(e) => setSelectedIndustry(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           >
-            {INDUSTRIES.map((ind) => (
-              <option key={ind} value={ind}>
-                {ind}
+            {industryOptions.map((ind) => (
+              <option key={ind.value} value={ind.value}>
+                {ind.label}
               </option>
             ))}
           </select>
