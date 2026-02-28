@@ -39,42 +39,16 @@ function AgentConsolePage() {
     dispatch(fetchAgents(params));
   }, [dispatch, statusFilter, typeFilter]);
 
+  const isAdmin = user?.role === 'it_admin';
+
   useEffect(() => {
-    if (user?.role === 'it_admin') {
+    if (user) {
       loadAgents();
     }
   }, [user, loadAgents]);
 
-  // Access control: IT Admin only
   if (!user) {
     return <Navigate to="/login" replace />;
-  }
-
-  if (user.role !== 'it_admin') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-        <svg
-          className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-          />
-        </svg>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          Access Denied
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md">
-          The Agent Management Console is only available to IT Administrators. Please contact your
-          administrator if you need access.
-        </p>
-      </div>
-    );
   }
 
   const handleCreate = async (data: AgentStackCreateRequest) => {
@@ -158,15 +132,22 @@ function AgentConsolePage() {
             Deploy, manage, and monitor AI agent stacks ({total} agents)
           </p>
         </div>
-        <button
-          onClick={() => setCreateModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Create Agent
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            Create Agent
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -253,11 +234,11 @@ function AgentConsolePage() {
                   key={agent.id}
                   agent={agent}
                   onSelect={handleSelect}
-                  onDeploy={handleDeploy}
-                  onPause={handlePause}
-                  onResume={handleResume}
-                  onStop={handleStop}
-                  onDelete={handleDelete}
+                  onDeploy={isAdmin ? handleDeploy : () => {}}
+                  onPause={isAdmin ? handlePause : () => {}}
+                  onResume={isAdmin ? handleResume : () => {}}
+                  onStop={isAdmin ? handleStop : () => {}}
+                  onDelete={isAdmin ? handleDelete : () => {}}
                 />
               ))}
             </div>
@@ -270,10 +251,10 @@ function AgentConsolePage() {
             <AgentDetailPanel
               agent={currentSelectedAgent}
               onClose={handleCloseDetail}
-              onDeploy={handleDeploy}
-              onPause={handlePause}
-              onResume={handleResume}
-              onStop={handleStop}
+              onDeploy={isAdmin ? handleDeploy : () => {}}
+              onPause={isAdmin ? handlePause : () => {}}
+              onResume={isAdmin ? handleResume : () => {}}
+              onStop={isAdmin ? handleStop : () => {}}
             />
           </div>
         )}

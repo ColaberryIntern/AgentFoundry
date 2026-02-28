@@ -1,6 +1,5 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import RoleManagementPage from './pages/RoleManagementPage';
@@ -13,6 +12,11 @@ import WebhooksPage from './pages/WebhooksPage';
 import RecommendationsPage from './pages/RecommendationsPage';
 import AgentConsolePage from './pages/AgentConsolePage';
 import AdvancedCompliancePage from './pages/AdvancedCompliancePage';
+import IntelligenceMapPage from './pages/IntelligenceMapPage';
+import SystemHealthPage from './pages/SystemHealthPage';
+import UseCasesPage from './pages/UseCasesPage';
+import CertificationsPage from './pages/CertificationsPage';
+import DeploymentsPage from './pages/DeploymentsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { useRouteFocus } from './hooks/useRouteFocus';
 
@@ -23,7 +27,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
-        <Route index element={<HomePage />} />
+        <Route index element={<IntelligenceMapPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="admin/roles" element={<RoleManagementPage />} />
@@ -34,8 +38,13 @@ function App() {
         <Route path="search" element={<SearchPage />} />
         <Route path="recommendations" element={<RecommendationsPage />} />
         <Route path="agents" element={<AgentConsolePage />} />
-        <Route path="compliance" element={<AdvancedCompliancePage />} />
+        <Route path="taxonomy" element={<AdvancedCompliancePage />} />
+        <Route path="compliance" element={<Navigate to="/taxonomy" replace />} />
         <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="use-cases" element={<UseCasesPage />} />
+        <Route path="certifications" element={<CertificationsPage />} />
+        <Route path="deployments" element={<DeploymentsPage />} />
+        <Route path="system-health" element={<SystemHealthPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

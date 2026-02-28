@@ -1,0 +1,77 @@
+/* ================================================================
+   Agent OS Design System — CSS Custom Properties
+   ================================================================ */
+
+:root {
+  /* Surface colors (light mode) */
+  --surface-primary: #ffffff;
+  --surface-secondary: #f8fafc;
+  --surface-tertiary: #f1f5f9;
+  --surface-glass: rgba(255, 255, 255, 0.7);
+  --surface-glass-border: rgba(0, 0, 0, 0.08);
+
+  /* Text */
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+
+  /* Sidebar */
+  --sidebar-bg: #f8fafc;
+  --sidebar-border: #e2e8f0;
+  --sidebar-item-hover: rgba(59, 130, 246, 0.08);
+  --sidebar-item-active: rgba(59, 130, 246, 0.12);
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+
+  /* Top bar */
+  --topbar-height: 56px;
+  --topbar-bg: rgba(255, 255, 255, 0.8);
+  --topbar-border: #e2e8f0;
+
+  /* Accents */
+  --accent-blue: #3b82f6;
+  --accent-green: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
+  --accent-purple: #8b5cf6;
+  --accent-cyan: #06b6d4;
+
+  /* Glass effect */
+  --glass-blur: 12px;
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+
+  /* Metric ring */
+  --ring-size: 80px;
+  --ring-stroke: 6px;
+  --ring-bg: #e2e8f0;
+}
+
+.dark {
+  /* Surface colors (dark mode — glassmorphism) */
+  --surface-primary: #0a0e1a;
+  --surface-secondary: #111827;
+  --surface-tertiary: #1e293b;
+  --surface-glass: rgba(255, 255, 255, 0.05);
+  --surface-glass-border: rgba(255, 255, 255, 0.1);
+
+  /* Text */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Sidebar */
+  --sidebar-bg: rgba(17, 24, 39, 0.95);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-item-hover: rgba(59, 130, 246, 0.15);
+  --sidebar-item-active: rgba(59, 130, 246, 0.2);
+
+  /* Top bar */
+  --topbar-bg: rgba(10, 14, 26, 0.85);
+  --topbar-border: rgba(255, 255, 255, 0.08);
+
+  /* Glass effect */
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+  /* Metric ring */
+  --ring-bg: #1e293b;
+}

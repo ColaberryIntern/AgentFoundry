@@ -18,6 +18,19 @@ export default {
           900: '#1e3a8a',
           950: '#172554',
         },
+        surface: {
+          primary: 'var(--surface-primary)',
+          secondary: 'var(--surface-secondary)',
+          tertiary: 'var(--surface-tertiary)',
+        },
+      },
+      spacing: {
+        sidebar: 'var(--sidebar-width)',
+        'sidebar-collapsed': 'var(--sidebar-collapsed-width)',
+        topbar: 'var(--topbar-height)',
+      },
+      backdropBlur: {
+        glass: 'var(--glass-blur)',
       },
     },
   },
