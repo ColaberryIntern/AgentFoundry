@@ -19,6 +19,12 @@ import './models/DeploymentInstance';
 import './models/CertificationRecord';
 import './models/RegistryAuditLog';
 import './models/SystemIntelligence';
+import './models/OrchestratorIntent';
+import './models/OrchestratorAction';
+import './models/OrchestratorSetting';
+import './models/OrchestratorGuardrailViolation';
+import './models/OrchestratorScanLog';
+import './models/MarketplaceSubmission';
 import healthRouter from './routes/health';
 import complianceRouter from './routes/compliance';
 import dashboardRouter from './routes/dashboard';
@@ -26,6 +32,7 @@ import regulationsRouter from './routes/regulations';
 import agentsRouter from './routes/agents';
 import calendarRouter from './routes/calendar';
 import registryRouter from './routes/registry';
+import orchestratorRouter from './routes/orchestrator';
 import { errorHandler } from './middleware/errorHandler';
 import { metricsMiddleware, metricsEndpoint } from './middleware/metrics';
 import logger from './utils/logger';
@@ -69,6 +76,7 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/regulations', regulationsRouter);
 app.use('/api/agents', agentsRouter);
 app.use('/api/registry', registryRouter);
+app.use('/api/registry/orchestrator', orchestratorRouter);
 
 // --------------- Error Handling ---------------
 app.use(errorHandler);

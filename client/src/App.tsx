@@ -17,6 +17,9 @@ import SystemHealthPage from './pages/SystemHealthPage';
 import UseCasesPage from './pages/UseCasesPage';
 import CertificationsPage from './pages/CertificationsPage';
 import DeploymentsPage from './pages/DeploymentsPage';
+import OrchestratorPage from './pages/OrchestratorPage';
+import OrchestratorSettingsPage from './pages/OrchestratorSettingsPage';
+import MarketplacePage from './pages/MarketplacePage';
 import NotFoundPage from './pages/NotFoundPage';
 import { useRouteFocus } from './hooks/useRouteFocus';
 
@@ -45,6 +48,9 @@ function App() {
         <Route path="certifications" element={<CertificationsPage />} />
         <Route path="deployments" element={<DeploymentsPage />} />
         <Route path="system-health" element={<SystemHealthPage />} />
+        <Route path="orchestrator" element={<OrchestratorPage />} />
+        <Route path="orchestrator/settings" element={<OrchestratorSettingsPage />} />
+        <Route path="marketplace" element={<MarketplacePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

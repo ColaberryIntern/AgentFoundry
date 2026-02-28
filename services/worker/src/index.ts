@@ -22,6 +22,10 @@ import {
   runPerformanceDriftAgent,
   runUseCaseReplicationAgent,
 } from './jobs/registryAgents';
+import { runOrchestratorSettingsSeeder } from './jobs/orchestratorSettingsSeeder';
+import { runOrchestratorScan } from './jobs/orchestratorScan';
+import { runOrchestratorSimulator } from './jobs/orchestratorSimulator';
+import { runOrchestratorExecutor } from './jobs/orchestratorExecutor';
 
 // ---------------------------------------------------------------------------
 // Wrap job execution with error handling and logging
@@ -54,6 +58,9 @@ async function main(): Promise<void> {
   // Phase 1: Seed NAICS industries + taxonomy (must run before other jobs)
   await runJob('industrySeeder', runIndustrySeeder);
   await runJob('taxonomySeeder', runTaxonomySeeder);
+
+  // Phase 1b: Seed orchestrator settings (depends on tables existing)
+  await runJob('orchestratorSettingsSeeder', runOrchestratorSettingsSeeder);
 
   // Phase 2: Run existing seed-capable jobs
   await runJob('agentManager', runAgentManager);
@@ -133,6 +140,25 @@ async function main(): Promise<void> {
     runJob('naicsUpdateAgent', runNaicsUpdateAgent);
   });
 
+  // -------------------------------------------------------------------------
+  // Executive Orchestrator agents
+  // -------------------------------------------------------------------------
+
+  // Orchestrator scan — every 10 minutes
+  cron.schedule('*/10 * * * *', () => {
+    runJob('orchestratorScan', runOrchestratorScan);
+  });
+
+  // Orchestrator simulator — every 2 minutes
+  cron.schedule('*/2 * * * *', () => {
+    runJob('orchestratorSimulator', runOrchestratorSimulator);
+  });
+
+  // Orchestrator executor — every 5 minutes
+  cron.schedule('*/5 * * * *', () => {
+    runJob('orchestratorExecutor', runOrchestratorExecutor);
+  });
+
   logger.info(
     [
       '',
@@ -151,9 +177,13 @@ async function main(): Promise<void> {
       '  Taxonomy Gap Agent:      weekly (Mon 3 AM)',
       '  Use Case Replication:    weekly (Mon 5 AM)',
       '  NAICS Update Agent:      quarterly',
+      '  ── Executive Orchestrator ──',
+      '  Orchestrator Scan:       every 10 min',
+      '  Orchestrator Simulator:  every 2 min',
+      '  Orchestrator Executor:   every 5 min',
       '==========================================',
       '  NAICS industries seeded: 24 sectors',
-      '  Registry agents active:  12 total',
+      '  Registry agents active:  15 total',
       '==========================================',
       '',
     ].join('\n'),

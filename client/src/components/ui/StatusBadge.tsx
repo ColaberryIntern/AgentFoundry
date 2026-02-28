@@ -20,7 +20,20 @@ type BadgeVariant =
   | 'draft'
   | 'unknown'
   | 'uncertified'
-  | 'info';
+  | 'info'
+  | 'detected'
+  | 'evaluating'
+  | 'proposed'
+  | 'simulating'
+  | 'executing'
+  | 'simulation_passed'
+  | 'simulation_failed'
+  | 'rolled_back'
+  | 'cancelled'
+  | 'under_review'
+  | 'published'
+  | 'delisted'
+  | 'submitted';
 
 interface StatusBadgeProps {
   variant: BadgeVariant;
@@ -149,6 +162,79 @@ const variantStyles: Record<string, { bg: string; text: string; dot: string }> =
     bg: 'bg-blue-100 dark:bg-blue-500/15',
     text: 'text-blue-700 dark:text-blue-400',
     dot: 'bg-blue-500',
+  },
+  detected: {
+    bg: 'bg-blue-100 dark:bg-blue-500/15',
+    text: 'text-blue-700 dark:text-blue-400',
+    dot: 'bg-blue-500',
+  },
+  evaluating: {
+    bg: 'bg-blue-100 dark:bg-blue-500/15',
+    text: 'text-blue-700 dark:text-blue-400',
+    dot: 'bg-blue-500',
+  },
+  simulating: {
+    bg: 'bg-blue-100 dark:bg-blue-500/15',
+    text: 'text-blue-700 dark:text-blue-400',
+    dot: 'bg-blue-500',
+  },
+  executing: {
+    bg: 'bg-blue-100 dark:bg-blue-500/15',
+    text: 'text-blue-700 dark:text-blue-400',
+    dot: 'bg-blue-500',
+  },
+  submitted: {
+    bg: 'bg-blue-100 dark:bg-blue-500/15',
+    text: 'text-blue-700 dark:text-blue-400',
+    dot: 'bg-blue-500',
+  },
+
+  // Amber family (orchestrator)
+  proposed: {
+    bg: 'bg-amber-100 dark:bg-amber-500/15',
+    text: 'text-amber-700 dark:text-amber-400',
+    dot: 'bg-amber-500',
+  },
+  under_review: {
+    bg: 'bg-amber-100 dark:bg-amber-500/15',
+    text: 'text-amber-700 dark:text-amber-400',
+    dot: 'bg-amber-500',
+  },
+
+  // Green family (orchestrator)
+  simulation_passed: {
+    bg: 'bg-emerald-100 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
+  },
+  published: {
+    bg: 'bg-emerald-100 dark:bg-emerald-500/15',
+    text: 'text-emerald-700 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
+  },
+
+  // Red family (orchestrator)
+  simulation_failed: {
+    bg: 'bg-red-100 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-400',
+    dot: 'bg-red-500',
+  },
+  rolled_back: {
+    bg: 'bg-red-100 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-400',
+    dot: 'bg-red-500',
+  },
+  delisted: {
+    bg: 'bg-red-100 dark:bg-red-500/15',
+    text: 'text-red-700 dark:text-red-400',
+    dot: 'bg-red-500',
+  },
+
+  // Gray family (orchestrator)
+  cancelled: {
+    bg: 'bg-gray-100 dark:bg-gray-500/15',
+    text: 'text-gray-600 dark:text-gray-400',
+    dot: 'bg-gray-400',
   },
 };
 
