@@ -1,4 +1,4 @@
-import { queryRows, execSql } from '../utils/db';
+import { queryRows, execSql, intToUuid } from '../utils/db';
 import { publishReportJob } from '../utils/rabbitmq';
 import logger from '../utils/logger';
 
@@ -21,7 +21,7 @@ export async function runReportScheduler(): Promise<void> {
     if (reportCount === 0) {
       const users = await queryRows('SELECT id FROM users LIMIT 3');
       const userIds = users.map((u) => u.id.toString());
-      const userId = userIds[0] || '1';
+      const userId = intToUuid(userIds[0] || '1');
 
       const seedReports = [
         {
@@ -73,7 +73,7 @@ export async function runReportScheduler(): Promise<void> {
     // Generate a new report periodically (every ~3 hours by random chance)
     if (Math.random() < 0.33) {
       const users = await queryRows('SELECT id FROM users LIMIT 1');
-      const userId = (users[0]?.id ?? 1).toString();
+      const userId = intToUuid(users[0]?.id ?? 1);
 
       const types = ['compliance_summary', 'risk_assessment', 'audit_trail', 'regulatory_status'];
       const type = types[Math.floor(Math.random() * types.length)];

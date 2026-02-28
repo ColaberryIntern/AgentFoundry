@@ -1,4 +1,4 @@
-import { queryRows, execSql } from '../utils/db';
+import { queryRows, execSql, intToUuid } from '../utils/db';
 import logger from '../utils/logger';
 
 const JOB = 'recommendationGenerator';
@@ -100,7 +100,7 @@ export async function runRecommendationGenerator(): Promise<void> {
 
     // Get users
     const users = await queryRows('SELECT id FROM users ORDER BY id');
-    const userIds = users.map((u) => u.id.toString());
+    const userIds = users.map((u) => intToUuid(u.id));
 
     if (userIds.length === 0) return;
 

@@ -1,4 +1,4 @@
-import { queryRows, execSql } from '../utils/db';
+import { queryRows, execSql, intToUuid } from '../utils/db';
 import { publishComplianceAlert } from '../utils/rabbitmq';
 import logger from '../utils/logger';
 
@@ -32,14 +32,16 @@ export async function runNotificationDispatcher(): Promise<void> {
       perUserCount[rec.user_id] = (perUserCount[rec.user_id] || 0) + 1;
       if (perUserCount[rec.user_id] > 3) continue;
 
+      const userUuid = intToUuid(rec.user_id);
+
       // Check if we already created a notification for this record
       const existing = await queryRows(
         `SELECT id FROM notifications
-         WHERE user_id = $1::text
+         WHERE user_id = $1::uuid
            AND metadata::text LIKE $2
            AND "createdAt" > NOW() - INTERVAL '30 minutes'
          LIMIT 1`,
-        [rec.user_id.toString(), `%complianceRecordId%${rec.id}%`],
+        [userUuid, `%complianceRecordId%${rec.id}%`],
       );
 
       if (existing.length > 0) continue;
@@ -52,10 +54,10 @@ export async function runNotificationDispatcher(): Promise<void> {
 
       await execSql(
         `INSERT INTO notifications (id, user_id, type, title, message, is_read, metadata, "createdAt", "updatedAt")
-         VALUES ($1::uuid, $2::text, 'compliance_alert', $3, $4, false, $5::json, NOW(), NOW())`,
+         VALUES ($1::uuid, $2::uuid, 'compliance_alert', $3, $4, false, $5::json, NOW(), NOW())`,
         [
           notifId,
-          rec.user_id.toString(),
+          userUuid,
           title,
           message,
           JSON.stringify({ complianceRecordId: rec.id, regulationId: rec.regulation_id }),
@@ -82,13 +84,14 @@ export async function runNotificationDispatcher(): Promise<void> {
     );
 
     for (const agent of agentRows) {
+      const agentUserUuid = intToUuid(agent.user_id);
       const existingAgentNotif = await queryRows(
         `SELECT id FROM notifications
-         WHERE user_id = $1
+         WHERE user_id = $1::uuid
            AND metadata::text LIKE $2
            AND "createdAt" > NOW() - INTERVAL '1 hour'
          LIMIT 1`,
-        [agent.user_id, `%agentId%${agent.id}%`],
+        [agentUserUuid, `%agentId%${agent.id}%`],
       );
 
       if (existingAgentNotif.length > 0) continue;
@@ -96,10 +99,10 @@ export async function runNotificationDispatcher(): Promise<void> {
       const notifId = generateId();
       await execSql(
         `INSERT INTO notifications (id, user_id, type, title, message, is_read, metadata, "createdAt", "updatedAt")
-         VALUES ($1::uuid, $2, 'system', $3, $4, false, $5::json, NOW(), NOW())`,
+         VALUES ($1::uuid, $2::uuid, 'system', $3, $4, false, $5::json, NOW(), NOW())`,
         [
           notifId,
-          agent.user_id,
+          agentUserUuid,
           `Agent ${agent.health_status}: ${agent.name}`,
           `Agent "${agent.name}" health status changed to ${agent.health_status}. Check the Agent Console for details.`,
           JSON.stringify({ agentId: agent.id, healthStatus: agent.health_status }),
