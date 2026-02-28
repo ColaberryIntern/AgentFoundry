@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { Notification } from '../models/Notification';
 import { AppError } from '../utils/AppError';
+import { intToUuid } from '../utils/intToUuid';
 import { pushToUser } from '../ws/notificationWs';
 import 'sequelize';
 
@@ -19,7 +20,7 @@ export async function listNotifications(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const userId = (req as any).user.userId;
+    const userId = intToUuid((req as any).user.userId);
     const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10) || 20));
     const offset = (page - 1) * limit;
@@ -61,7 +62,7 @@ export async function getUnreadCount(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const userId = (req as any).user.userId;
+    const userId = intToUuid((req as any).user.userId);
 
     const count = await Notification.count({
       where: { userId, isRead: false },
@@ -80,7 +81,7 @@ export async function getUnreadCount(
  */
 export async function markAsRead(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const userId = (req as any).user.userId;
+    const userId = intToUuid((req as any).user.userId);
     const { id } = req.params;
 
     const notification = await Notification.findByPk(id);
@@ -114,7 +115,7 @@ export async function markAllAsRead(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const userId = (req as any).user.userId;
+    const userId = intToUuid((req as any).user.userId);
 
     const [updatedCount] = await Notification.update(
       { isRead: true },
@@ -139,9 +140,9 @@ export async function createNotification(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { userId, type, title, message, metadata } = req.body;
+    const { userId: rawUserId, type, title, message, metadata } = req.body;
 
-    if (!userId || !type || !title || !message) {
+    if (!rawUserId || !type || !title || !message) {
       throw AppError.badRequest('Missing required fields: userId, type, title, message');
     }
 
@@ -151,6 +152,8 @@ export async function createNotification(
         `Invalid notification type. Must be one of: ${validTypes.join(', ')}`,
       );
     }
+
+    const userId = intToUuid(rawUserId);
 
     const notification = await Notification.create({
       userId,

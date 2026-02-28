@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import { Report, ReportType, ReportFormat } from '../models/Report';
 import { ReportTemplate } from '../models/ReportTemplate';
 import { AppError } from '../utils/AppError';
+import { intToUuid } from '../utils/intToUuid';
 import rabbitmq from '../utils/rabbitmq';
 import { generateReport } from '../utils/reportGenerator';
 
@@ -67,8 +68,9 @@ export async function createReport(req: Request, res: Response, next: NextFuncti
     const finalParameters = Object.keys(mergedParameters).length > 0 ? mergedParameters : null;
 
     // --- Create record ---
+    const userUuid = intToUuid(user.userId);
     const report = await Report.create({
-      userId: user.userId,
+      userId: userUuid,
       reportType,
       parameters: finalParameters,
       format: reportFormat,
@@ -121,7 +123,7 @@ export async function getReport(req: Request, res: Response, next: NextFunction)
       throw AppError.notFound('Report not found');
     }
 
-    if (report.userId !== user.userId && user.role !== 'it_admin') {
+    if (report.userId !== intToUuid(user.userId) && user.role !== 'it_admin') {
       throw AppError.forbidden('You do not have permission to view this report');
     }
 
@@ -148,7 +150,7 @@ export async function listReports(req: Request, res: Response, next: NextFunctio
 
     // Non-admins only see own reports
     if (user.role !== 'it_admin') {
-      where.userId = user.userId;
+      where.userId = intToUuid(user.userId);
     }
 
     // Optional status filter

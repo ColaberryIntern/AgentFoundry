@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import axios from 'axios';
 import { Recommendation } from '../models/Recommendation';
+import { intToUuid } from '../utils/intToUuid';
 import { aiInferenceDuration, aiRecommendationsGenerated } from '../middleware/metrics';
 
 const MODEL_SERVER_URL = process.env.MODEL_SERVER_URL || 'http://localhost:8000';
@@ -19,7 +20,8 @@ export async function complianceGaps(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { userId, complianceData } = req.body;
+    const { userId: rawUserId, complianceData } = req.body;
+    const userId = rawUserId ? intToUuid(rawUserId) : rawUserId;
 
     const start = Date.now();
     let response;
@@ -94,7 +96,8 @@ export async function regulatoryPredictions(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { userId, regulationIds } = req.body;
+    const { userId: rawRegUserId, regulationIds } = req.body;
+    const userId = rawRegUserId ? intToUuid(rawRegUserId) : rawRegUserId;
 
     const start = Date.now();
     let response;

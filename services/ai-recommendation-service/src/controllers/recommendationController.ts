@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { Recommendation } from '../models/Recommendation';
 import { AppError } from '../utils/AppError';
+import { intToUuid } from '../utils/intToUuid';
 
 /**
  * GET /api/recommendations
@@ -21,7 +22,7 @@ export async function listRecommendations(
     const where: Record<string, unknown> = {};
 
     if (req.query.userId) {
-      where.userId = req.query.userId;
+      where.userId = intToUuid(req.query.userId as string);
     }
 
     if (req.query.type) {

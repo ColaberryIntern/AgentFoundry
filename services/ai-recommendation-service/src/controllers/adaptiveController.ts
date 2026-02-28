@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UserInteraction } from '../models/UserInteraction';
 import { AppError } from '../utils/AppError';
+import { intToUuid } from '../utils/intToUuid';
 
 /**
  * Default dashboard layout order. Widgets that the user clicks more
@@ -75,11 +76,13 @@ export async function getAdaptivePreferences(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { userId } = req.params;
+    const { userId: rawUserId } = req.params;
 
-    if (!userId) {
+    if (!rawUserId) {
       throw AppError.badRequest('userId parameter is required');
     }
+
+    const userId = intToUuid(rawUserId);
 
     const interactions = await UserInteraction.findAll({
       where: { userId },
