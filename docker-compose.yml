@@ -215,6 +215,23 @@ services:
     networks:
       - agent-foundry-network
 
+  worker:
+    build:
+      context: ./services/worker
+      dockerfile: Dockerfile
+    environment:
+      <<: *common-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - agent-foundry-network
+    restart: unless-stopped
+
   client:
     build:
       context: .
