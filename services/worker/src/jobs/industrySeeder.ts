@@ -533,7 +533,7 @@ export async function runIndustrySeeder(): Promise<void> {
           await execSql(
             `INSERT INTO ontology_relationships (id, subject_type, subject_id, relationship_type, object_type, object_id, weight, metadata, version, "createdAt", "updatedAt")
              VALUES ($1::uuid, 'regulation', $2, 'APPLIES_TO', 'industry', $3, 1.0, $4::json, 1, NOW(), NOW())
-             ON CONFLICT ON CONSTRAINT idx_ontology_unique_rel DO NOTHING`,
+             ON CONFLICT DO NOTHING`,
             [
               generateDeterministicUuid(`rel-${reg.name}-${s.code}`),
               regId,
@@ -548,7 +548,7 @@ export async function runIndustrySeeder(): Promise<void> {
           await execSql(
             `INSERT INTO ontology_relationships (id, subject_type, subject_id, relationship_type, object_type, object_id, weight, metadata, version, "createdAt", "updatedAt")
              VALUES ($1::uuid, 'regulation', $2, 'APPLIES_TO', 'industry', $3, 1.0, $4::json, 1, NOW(), NOW())
-             ON CONFLICT ON CONSTRAINT idx_ontology_unique_rel DO NOTHING`,
+             ON CONFLICT DO NOTHING`,
             [
               generateDeterministicUuid(`rel-${reg.name}-${sectorCode}`),
               regId,

@@ -676,7 +676,7 @@ export async function runTaxonomySeeder(): Promise<void> {
         await execSql(
           `INSERT INTO ontology_relationships (id, subject_type, subject_id, relationship_type, object_type, object_id, weight, metadata, version, "createdAt", "updatedAt")
            VALUES ($1::uuid, 'use_case', $2, 'OPERATES_IN', 'industry', $3, $4, NULL, 1, NOW(), NOW())
-           ON CONFLICT ON CONSTRAINT idx_ontology_unique_rel DO NOTHING`,
+           ON CONFLICT DO NOTHING`,
           [generateId(), id, ind, uc.urgency],
         );
       }
@@ -716,7 +716,7 @@ export async function runTaxonomySeeder(): Promise<void> {
         await execSql(
           `INSERT INTO ontology_relationships (id, subject_type, subject_id, relationship_type, object_type, object_id, weight, metadata, version, "createdAt", "updatedAt")
            VALUES ($1::uuid, 'agent_skeleton', $2, 'COMPLIES_WITH', 'regulation', $3, 1.0, NULL, 1, NOW(), NOW())
-           ON CONFLICT ON CONSTRAINT idx_ontology_unique_rel DO NOTHING`,
+           ON CONFLICT DO NOTHING`,
           [generateId(), skId, regNodeId],
         );
         relCount++;
