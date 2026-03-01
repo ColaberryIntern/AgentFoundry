@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
@@ -23,6 +24,8 @@ import MarketplacePage from './pages/MarketplacePage';
 import NotFoundPage from './pages/NotFoundPage';
 import { useRouteFocus } from './hooks/useRouteFocus';
 
+const GraphPage = lazy(() => import('./pages/GraphPage'));
+
 function App() {
   // Move focus to h1 heading after every client-side navigation
   useRouteFocus();
@@ -30,7 +33,14 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
-        <Route index element={<IntelligenceMapPage />} />
+        <Route
+          index
+          element={
+            <Suspense fallback={<IntelligenceMapPage />}>
+              <GraphPage />
+            </Suspense>
+          }
+        />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="admin/roles" element={<RoleManagementPage />} />

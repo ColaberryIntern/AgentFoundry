@@ -14,6 +14,7 @@ import agentsReducer from './agentsSlice';
 import complianceReducer from './complianceSlice';
 import registryReducer from './registrySlice';
 import orchestratorReducer from './orchestratorSlice';
+import graphReducer from '../graph/state/graphSlice';
 
 export const store = configureStore({
   reducer: {
@@ -32,6 +33,7 @@ export const store = configureStore({
     compliance: complianceReducer,
     registry: registryReducer,
     orchestrator: orchestratorReducer,
+    graph: graphReducer,
   },
 });
 
