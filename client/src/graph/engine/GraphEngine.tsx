@@ -34,6 +34,9 @@ import { SemanticEdge } from '../edges/SemanticEdge';
 // Overlay imports
 import { TraverseMenu } from '../menus/TraverseMenu';
 import { ModeToolbar } from '../modes/ModeToolbar';
+import { CommandConsole } from '../console/CommandConsole';
+import { SimulationBanner } from '../simulation/SimulationBanner';
+import { SystemHealthOrb } from '../widgets/SystemHealthOrb';
 
 // Custom node type registry
 const nodeTypes = {
@@ -162,11 +165,20 @@ function GraphEngineInner() {
         />
       </ReactFlow>
 
+      {/* Simulation Banner (top) */}
+      <SimulationBanner />
+
       {/* Mode Toolbar overlay */}
       <ModeToolbar />
 
+      {/* System Health Orb */}
+      <SystemHealthOrb />
+
       {/* Traverse Menu */}
       <TraverseMenu />
+
+      {/* Command Console (bottom) */}
+      <CommandConsole />
 
       {/* Stats bar */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-lg bg-[var(--surface-primary)]/60 backdrop-blur-md border border-white/5 text-[10px] text-[var(--text-muted)]">
