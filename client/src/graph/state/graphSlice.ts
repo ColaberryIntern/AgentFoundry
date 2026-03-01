@@ -9,6 +9,8 @@ import type {
 import { INITIAL_GRAPH_STATE, DEFAULT_FILTERS } from '../types/graphState';
 import { registryApi } from '../../services/registryApi';
 import type { OntologyRelationship } from '../../types/compliance';
+import type { AltitudeLevel, AltitudeContext } from '../altitude/altitudeTypes';
+import { AltitudeController } from '../altitude/AltitudeController';
 
 // ---------------------------------------------------------------------------
 // Ontology thunk (fetches relationships for graph edges)
@@ -161,6 +163,8 @@ const graphSlice = createSlice({
         filters: { ...state.filters },
         viewport: action.payload.viewport,
         label: action.payload.label,
+        altitude: state.currentAltitude,
+        altitudeContext: { ...state.altitudeContext },
       };
       state.graphStateStack.push(entry);
       // Cap at 20 entries
@@ -177,8 +181,63 @@ const graphSlice = createSlice({
         state.selectedNodeIds = entry.selectedNodeIds;
         state.viewMode = entry.viewMode;
         state.filters = entry.filters;
+        // Restore altitude
+        state.currentAltitude = entry.altitude;
+        state.altitudeContext = entry.altitudeContext;
         // viewport is restored by the component reading the stack
       }
+    },
+
+    // -- Altitude --
+    setAltitude(state, action: PayloadAction<{ level: AltitudeLevel; context: AltitudeContext }>) {
+      state.currentAltitude = action.payload.level;
+      state.altitudeContext = action.payload.context;
+      // Clear selection on altitude change
+      state.selectedNodeIds = [];
+      state.contextPanelOpen = false;
+      state.contextPanelNodeId = null;
+      state.contextPanelNodeType = null;
+    },
+
+    descendAltitude(state, action: PayloadAction<{ targetId: string; targetType: string }>) {
+      const result = AltitudeController.descend(
+        state.currentAltitude,
+        state.altitudeContext,
+        action.payload.targetId,
+        action.payload.targetType,
+      );
+      if (result) {
+        state.currentAltitude = result.level;
+        state.altitudeContext = result.context;
+        state.altitudeAnimating = true;
+        // Clear selection on descent
+        state.selectedNodeIds = [];
+        state.contextPanelOpen = false;
+        state.contextPanelNodeId = null;
+        state.contextPanelNodeType = null;
+        state.expandedNodeIds = [];
+        state.isolatedSubgraphRoot = null;
+      }
+    },
+
+    ascendAltitude(state) {
+      const result = AltitudeController.ascend(state.currentAltitude, state.altitudeContext);
+      if (result) {
+        state.currentAltitude = result.level;
+        state.altitudeContext = result.context;
+        state.altitudeAnimating = true;
+        // Clear selection on ascent
+        state.selectedNodeIds = [];
+        state.contextPanelOpen = false;
+        state.contextPanelNodeId = null;
+        state.contextPanelNodeType = null;
+        state.expandedNodeIds = [];
+        state.isolatedSubgraphRoot = null;
+      }
+    },
+
+    setAltitudeAnimating(state, action: PayloadAction<boolean>) {
+      state.altitudeAnimating = action.payload;
     },
 
     // -- Simulation --
@@ -234,6 +293,10 @@ export const {
   hideContextMenu,
   pushState,
   popState,
+  setAltitude,
+  descendAltitude,
+  ascendAltitude,
+  setAltitudeAnimating,
   enterSimulation,
   exitSimulation,
   addSimulationModification,

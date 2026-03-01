@@ -1,4 +1,6 @@
 import type { GraphNodeType, ViewMode, ContextMenuState } from './graphTypes';
+import type { AltitudeLevel, AltitudeContext } from '../altitude/altitudeTypes';
+import { EMPTY_ALTITUDE_CONTEXT } from '../altitude/altitudeTypes';
 
 // ---------------------------------------------------------------------------
 // Graph State Stack Entry — snapshot for back-navigation
@@ -14,6 +16,9 @@ export interface GraphStateEntry {
   filters: GraphFilters;
   viewport: { x: number; y: number; zoom: number };
   label: string;
+  // Altitude snapshot
+  altitude: AltitudeLevel;
+  altitudeContext: AltitudeContext;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +67,11 @@ export interface GraphUIState {
   // View mode
   viewMode: ViewMode;
 
+  // Altitude
+  currentAltitude: AltitudeLevel;
+  altitudeContext: AltitudeContext;
+  altitudeAnimating: boolean;
+
   // Navigation stack
   graphStateStack: GraphStateEntry[];
 
@@ -94,6 +104,9 @@ export const DEFAULT_FILTERS: GraphFilters = {
     'deployment',
     'risk',
     'marketplace',
+    'industryCluster',
+    'useCaseCluster',
+    'stackCluster',
   ],
   certificationStatus: [],
   industryCode: null,
@@ -107,6 +120,9 @@ export const INITIAL_GRAPH_STATE: GraphUIState = {
   contextPanelNodeId: null,
   contextPanelNodeType: null,
   viewMode: 'strategy',
+  currentAltitude: 'GLOBAL',
+  altitudeContext: { ...EMPTY_ALTITUDE_CONTEXT },
+  altitudeAnimating: false,
   graphStateStack: [],
   expandedNodeIds: [],
   isolatedSubgraphRoot: null,

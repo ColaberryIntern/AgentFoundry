@@ -2,7 +2,7 @@ import { useSimulation } from './SimulationProvider';
 import { useSimulationData } from './useSimulationData';
 
 export function SimulationBanner() {
-  const { active, exit, enteredAt } = useSimulation();
+  const { active, exit, enteredAt, altitudeLabel } = useSimulation();
   const { stats } = useSimulationData();
 
   if (!active) return null;
@@ -19,6 +19,7 @@ export function SimulationBanner() {
           <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
             Simulation Mode
           </span>
+          <span className="text-[10px] text-amber-300/60">@ {altitudeLabel}</span>
         </div>
         {stats.total > 0 && (
           <div className="flex items-center gap-2 text-[10px] text-amber-300/70">

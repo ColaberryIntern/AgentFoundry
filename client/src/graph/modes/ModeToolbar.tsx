@@ -1,6 +1,7 @@
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import type { ViewMode } from '../types/graphTypes';
 import { pushState, setViewMode } from '../state/graphSlice';
+import { AltitudeController } from '../altitude/AltitudeController';
 
 interface ModeButton {
   id: ViewMode;
@@ -104,10 +105,15 @@ const MODES: ModeButton[] = [
 
 export function ModeToolbar() {
   const dispatch = useAppDispatch();
-  const { viewMode, graphStateStack, simulationMode } = useAppSelector((s) => s.graph);
+  const { viewMode, graphStateStack, simulationMode, currentAltitude } = useAppSelector(
+    (s) => s.graph,
+  );
+
+  const availableModes = AltitudeController.getAvailableModes(currentAltitude);
 
   const handleModeClick = (mode: ViewMode) => {
     if (mode === viewMode) return;
+    if (!availableModes.includes(mode)) return;
     dispatch(pushState({ viewport: { x: 0, y: 0, zoom: 1 }, label: `Mode: ${mode}` }));
     dispatch(setViewMode(mode));
   };
@@ -119,7 +125,7 @@ export function ModeToolbar() {
   };
 
   return (
-    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 p-1 rounded-xl bg-[var(--surface-primary)]/80 backdrop-blur-xl border border-white/10 shadow-lg">
+    <div className="absolute top-12 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 p-1 rounded-xl bg-[var(--surface-primary)]/80 backdrop-blur-xl border border-white/10 shadow-lg">
       {/* Back button */}
       {graphStateStack.length > 0 && (
         <button
@@ -139,24 +145,30 @@ export function ModeToolbar() {
       )}
 
       {/* Mode buttons */}
-      {MODES.map((mode) => (
-        <button
-          key={mode.id}
-          onClick={() => handleModeClick(mode.id)}
-          className={`
-            flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
-            ${
-              viewMode === mode.id
-                ? 'bg-blue-500/20 text-blue-400 shadow-sm shadow-blue-500/10'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5'
-            }
-          `}
-          title={mode.label}
-        >
-          {mode.icon}
-          <span className="hidden sm:inline">{mode.shortLabel}</span>
-        </button>
-      ))}
+      {MODES.map((mode) => {
+        const isAvailable = availableModes.includes(mode.id);
+        return (
+          <button
+            key={mode.id}
+            onClick={() => handleModeClick(mode.id)}
+            disabled={!isAvailable}
+            className={`
+              flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200
+              ${
+                !isAvailable
+                  ? 'text-[var(--text-muted)]/30 cursor-not-allowed opacity-30'
+                  : viewMode === mode.id
+                    ? 'bg-blue-500/20 text-blue-400 shadow-sm shadow-blue-500/10'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5'
+              }
+            `}
+            title={isAvailable ? mode.label : `${mode.label} (not available at this altitude)`}
+          >
+            {mode.icon}
+            <span className="hidden sm:inline">{mode.shortLabel}</span>
+          </button>
+        );
+      })}
 
       {/* Simulation indicator */}
       {simulationMode && (

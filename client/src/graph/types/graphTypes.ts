@@ -12,7 +12,10 @@ export type GraphNodeType =
   | 'certification'
   | 'deployment'
   | 'risk'
-  | 'marketplace';
+  | 'marketplace'
+  | 'industryCluster'
+  | 'useCaseCluster'
+  | 'stackCluster';
 
 export type GraphEdgeType =
   | 'hierarchical'
@@ -244,6 +247,24 @@ export const NODE_COLORS: Record<
     text: 'text-pink-400',
     glow: 'shadow-pink-500/20',
   },
+  industryCluster: {
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/30',
+    text: 'text-blue-400',
+    glow: 'shadow-blue-500/20',
+  },
+  useCaseCluster: {
+    bg: 'bg-amber-500/10',
+    border: 'border-amber-500/30',
+    text: 'text-amber-400',
+    glow: 'shadow-amber-500/20',
+  },
+  stackCluster: {
+    bg: 'bg-purple-500/10',
+    border: 'border-purple-500/30',
+    text: 'text-purple-400',
+    glow: 'shadow-purple-500/20',
+  },
 };
 
 export const NODE_TYPE_LABELS: Record<GraphNodeType, string> = {
@@ -255,6 +276,9 @@ export const NODE_TYPE_LABELS: Record<GraphNodeType, string> = {
   deployment: 'Deployment',
   risk: 'Risk',
   marketplace: 'Marketplace',
+  industryCluster: 'Industry Cluster',
+  useCaseCluster: 'Use Case Cluster',
+  stackCluster: 'Stack Cluster',
 };
 
 export const NODE_TYPE_ABBREVS: Record<GraphNodeType, string> = {
@@ -266,4 +290,7 @@ export const NODE_TYPE_ABBREVS: Record<GraphNodeType, string> = {
   deployment: 'DEP',
   risk: 'RSK',
   marketplace: 'MKT',
+  industryCluster: 'IND',
+  useCaseCluster: 'UC',
+  stackCluster: 'STK',
 };

@@ -13,6 +13,9 @@ const ALL_NODE_TYPES: GraphNodeType[] = [
   'deployment',
   'risk',
   'marketplace',
+  'industryCluster',
+  'useCaseCluster',
+  'stackCluster',
 ];
 
 function makeEmphasis(

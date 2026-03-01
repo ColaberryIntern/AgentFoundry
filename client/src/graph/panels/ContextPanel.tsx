@@ -3,6 +3,7 @@ import { closeContextPanel } from '../state/graphSlice';
 import type {
   GraphNodeType,
   GraphNodeData,
+  BaseNodeData,
   IndustryNodeData,
   UseCaseNodeData,
   SkeletonNodeData,
@@ -40,9 +41,84 @@ function renderPanelContent(nodeType: GraphNodeType, data: GraphNodeData) {
       return <RiskPanel data={data as RiskNodeData} />;
     case 'marketplace':
       return <MarketplacePanel data={data as MarketplaceNodeData} />;
+    case 'industryCluster':
+    case 'useCaseCluster':
+    case 'stackCluster':
+      return <ClusterSummaryPanel nodeType={nodeType} data={data} />;
     default:
       return <EmptyPanel />;
   }
+}
+
+function ClusterSummaryPanel({ nodeType, data }: { nodeType: string; data: GraphNodeData }) {
+  const label = data.label ?? 'Cluster';
+  const base = data as BaseNodeData & Record<string, unknown>;
+
+  const clusterLabels: Record<string, string> = {
+    industryCluster: 'Industry Cluster',
+    useCaseCluster: 'Use Case Cluster',
+    stackCluster: 'Stack Cluster',
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">
+          {clusterLabels[nodeType] ?? 'Cluster'}
+        </div>
+        <div className="text-lg font-bold text-[var(--text-primary)]">{label}</div>
+        {base.sublabel && (
+          <div className="text-sm text-[var(--text-muted)] mt-0.5">{String(base.sublabel)}</div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {typeof base.useCaseCount === 'number' && (
+          <MetricTile label="Use Cases" value={base.useCaseCount as number} />
+        )}
+        {typeof base.stackCount === 'number' && (
+          <MetricTile label="Stacks" value={base.stackCount as number} />
+        )}
+        {typeof base.agentCount === 'number' && (
+          <MetricTile label="Agents" value={base.agentCount as number} />
+        )}
+        {typeof base.variantCount === 'number' && (
+          <MetricTile label="Variants" value={base.variantCount as number} />
+        )}
+        {typeof base.certHealthPercent === 'number' && (
+          <MetricTile label="Cert Health" value={`${base.certHealthPercent as number}%`} />
+        )}
+        {typeof base.riskIndex === 'number' && (
+          <MetricTile label="Risk Index" value={base.riskIndex as number} color="text-red-400" />
+        )}
+        {typeof base.activeDeployments === 'number' && (
+          <MetricTile label="Deployments" value={base.activeDeployments as number} />
+        )}
+        {typeof base.coveragePercent === 'number' && (
+          <MetricTile label="Coverage" value={`${base.coveragePercent as number}%`} />
+        )}
+      </div>
+
+      <div className="text-xs text-[var(--text-muted)]">Click to descend into this cluster</div>
+    </div>
+  );
+}
+
+function MetricTile({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number | string;
+  color?: string;
+}) {
+  return (
+    <div className="p-2 rounded-lg bg-white/[0.03] border border-white/5 text-center">
+      <div className="text-[10px] text-[var(--text-muted)]">{label}</div>
+      <div className={`text-lg font-bold ${color ?? 'text-[var(--text-primary)]'}`}>{value}</div>
+    </div>
+  );
 }
 
 // Simple inline risk panel since it wasn't created separately

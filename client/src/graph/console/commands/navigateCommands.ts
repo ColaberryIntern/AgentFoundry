@@ -6,8 +6,18 @@ import {
   deselectAll,
   exitIsolation,
   resetFilters,
+  setAltitude,
+  descendAltitude,
+  ascendAltitude,
+  pushState,
 } from '../../state/graphSlice';
 import type { GraphNodeType } from '../../types/graphTypes';
+import {
+  ALTITUDE_ORDER,
+  ALTITUDE_LABELS,
+  EMPTY_ALTITUDE_CONTEXT,
+} from '../../altitude/altitudeTypes';
+import type { AltitudeLevel } from '../../altitude/altitudeTypes';
 
 export function registerNavigateCommands() {
   commandRegistry.register(
@@ -76,13 +86,90 @@ export function registerNavigateCommands() {
 
   commandRegistry.register(
     'home',
-    'Return to default view (clear isolation, filters, selection)',
+    'Return to GLOBAL altitude (clear isolation, filters, selection)',
     'home',
     (_args, dispatch) => {
       dispatch(deselectAll());
       dispatch(exitIsolation());
       dispatch(resetFilters());
-      return { ok: true, message: 'Returned to home view' };
+      dispatch(
+        setAltitude({
+          level: 'GLOBAL',
+          context: { ...EMPTY_ALTITUDE_CONTEXT },
+        }),
+      );
+      return { ok: true, message: 'Returned to GLOBAL altitude' };
     },
   );
+
+  // --- Altitude Navigation Commands ---
+
+  commandRegistry.register(
+    'altitude',
+    'Jump to a specific altitude level',
+    'altitude <global|industry|use_case|stack|agent>',
+    (args, dispatch) => {
+      if (args.length === 0) {
+        const levels = ALTITUDE_ORDER.map(
+          (l) => `  ${l.toLowerCase()} — ${ALTITUDE_LABELS[l]}`,
+        ).join('\n');
+        return {
+          ok: true,
+          message: `Available altitudes:\n${levels}\nUsage: altitude <level>`,
+        };
+      }
+
+      const input = args[0].toUpperCase().replace('-', '_') as AltitudeLevel;
+      if (!ALTITUDE_ORDER.includes(input)) {
+        return {
+          ok: false,
+          message: `Unknown altitude "${args[0]}". Valid: ${ALTITUDE_ORDER.map((l) => l.toLowerCase()).join(', ')}`,
+        };
+      }
+
+      dispatch(pushState({ viewport: { x: 0, y: 0, zoom: 1 }, label: `Jump to ${input}` }));
+      dispatch(
+        setAltitude({
+          level: input,
+          context: { ...EMPTY_ALTITUDE_CONTEXT },
+        }),
+      );
+      return { ok: true, message: `Jumped to ${ALTITUDE_LABELS[input]}` };
+    },
+  );
+
+  commandRegistry.register(
+    'descend',
+    'Descend into a cluster by entity ID',
+    'descend <entityId>',
+    (args, dispatch) => {
+      if (args.length === 0) {
+        return { ok: false, message: 'Usage: descend <entityId> (e.g., descend 51)' };
+      }
+
+      const targetId = args.join(' ');
+
+      // Guess the target type from the ID pattern
+      let targetType: GraphNodeType = 'industryCluster';
+      if (/^\d{2,6}$/.test(targetId)) {
+        targetType = 'industryCluster';
+      } else if (targetId.startsWith('usecase-') || targetId.startsWith('uc-')) {
+        targetType = 'useCaseCluster';
+      } else if (targetId.startsWith('skeleton-') || targetId.startsWith('sk-')) {
+        targetType = 'stackCluster';
+      } else if (targetId.startsWith('variant-') || targetId.startsWith('v-')) {
+        targetType = 'variant';
+      }
+
+      dispatch(pushState({ viewport: { x: 0, y: 0, zoom: 1 }, label: `Descend into ${targetId}` }));
+      dispatch(descendAltitude({ targetId, targetType }));
+      return { ok: true, message: `Descending into ${targetId}` };
+    },
+  );
+
+  commandRegistry.register('ascend', 'Ascend one altitude level', 'ascend', (_args, dispatch) => {
+    dispatch(pushState({ viewport: { x: 0, y: 0, zoom: 1 }, label: 'Ascend' }));
+    dispatch(ascendAltitude());
+    return { ok: true, message: 'Ascending one altitude level' };
+  });
 }

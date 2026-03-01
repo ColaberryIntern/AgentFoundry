@@ -11,13 +11,13 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { useAppDispatch } from '../../store/hooks';
-import { useGraphData } from './useGraphData';
-import { useGraphLayout } from './useGraphLayout';
-import { useDrillController } from '../controller/useDrillController';
+import { useAltitudeData } from '../altitude/useAltitudeData';
+import { useAltitudeLayout } from '../altitude/useAltitudeLayout';
+import { useAltitudeController } from '../altitude/useAltitudeController';
 import { getNodeTypeFromId } from './nodeTransformers';
-import { hoverNode } from '../state/graphSlice';
+import { hoverNode, deselectAll, hideContextMenu } from '../state/graphSlice';
 
-// Custom node imports
+// Custom node imports (detail nodes)
 import { IndustryNode } from '../nodes/IndustryNode';
 import { UseCaseNode } from '../nodes/UseCaseNode';
 import { SkeletonNode } from '../nodes/SkeletonNode';
@@ -26,6 +26,11 @@ import { CertificationNode } from '../nodes/CertificationNode';
 import { DeploymentNode } from '../nodes/DeploymentNode';
 import { RiskNode } from '../nodes/RiskNode';
 import { MarketplaceNode } from '../nodes/MarketplaceNode';
+
+// Cluster node imports (altitude aggregate nodes)
+import { IndustryClusterNode } from '../nodes/IndustryClusterNode';
+import { UseCaseClusterNode } from '../nodes/UseCaseClusterNode';
+import { StackClusterNode } from '../nodes/StackClusterNode';
 
 // Custom edge imports
 import { HierarchicalEdge } from '../edges/HierarchicalEdge';
@@ -37,9 +42,13 @@ import { ModeToolbar } from '../modes/ModeToolbar';
 import { CommandConsole } from '../console/CommandConsole';
 import { SimulationBanner } from '../simulation/SimulationBanner';
 import { SystemHealthOrb } from '../widgets/SystemHealthOrb';
+import { AltitudeBreadcrumb } from '../altitude/AltitudeBreadcrumb';
+import { AltitudeIndicator } from '../altitude/AltitudeIndicator';
+import { ALTITUDE_LABELS } from '../altitude/altitudeTypes';
 
-// Custom node type registry
+// Node type registry (detail + cluster nodes)
 const nodeTypes = {
+  // Detail nodes (STACK & AGENT altitudes)
   industryNode: IndustryNode,
   useCaseNode: UseCaseNode,
   skeletonNode: SkeletonNode,
@@ -48,52 +57,84 @@ const nodeTypes = {
   deploymentNode: DeploymentNode,
   riskNode: RiskNode,
   marketplaceNode: MarketplaceNode,
+  // Cluster nodes (GLOBAL, INDUSTRY, USE_CASE altitudes)
+  industryClusterNode: IndustryClusterNode,
+  useCaseClusterNode: UseCaseClusterNode,
+  stackClusterNode: StackClusterNode,
 };
 
-// Custom edge type registry
+// Edge type registry
 const edgeTypes = {
   hierarchicalEdge: HierarchicalEdge,
   semanticEdge: SemanticEdge,
 };
 
+// MiniMap color mapping
+const miniMapColorMap: Record<string, string> = {
+  industry: '#3b82f6',
+  useCase: '#f59e0b',
+  skeleton: '#a855f7',
+  variant: '#06b6d4',
+  certification: '#10b981',
+  deployment: '#6366f1',
+  risk: '#ef4444',
+  marketplace: '#ec4899',
+  industryCluster: '#3b82f6',
+  useCaseCluster: '#f59e0b',
+  stackCluster: '#a855f7',
+};
+
 function GraphEngineInner() {
   const dispatch = useAppDispatch();
-  const controller = useDrillController();
+  const altitudeCtrl = useAltitudeController();
+
+  // Altitude-scoped data (replaces useGraphData)
   const {
     nodes: rawNodes,
     edges: rawEdges,
-    layoutDirection,
+    layoutStrategy,
     nodeCount,
     edgeCount,
-  } = useGraphData();
-  const { nodes, edges } = useGraphLayout(rawNodes, rawEdges, layoutDirection);
+    altitude,
+  } = useAltitudeData();
 
-  // -- Event Handlers (routed through DrillController) --
+  // Altitude-aware layout (replaces useGraphLayout)
+  const { nodes, edges } = useAltitudeLayout(rawNodes, rawEdges, layoutStrategy);
+
+  // -- Event Handlers (routed through AltitudeController) --
   const onNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
-      const nodeType = getNodeTypeFromId(node.id);
-      if (nodeType) {
-        controller.handleNodeClick(node.id, nodeType, event as unknown as React.MouseEvent);
-      }
+      altitudeCtrl.handleNodeClick(node.id, event as unknown as React.MouseEvent);
     },
-    [controller],
+    [altitudeCtrl],
   );
 
   const onNodeDoubleClick: NodeMouseHandler = useCallback(
     (_event, node) => {
-      controller.handleNodeDoubleClick(node.id);
+      altitudeCtrl.handleNodeDoubleClick(node.id);
     },
-    [controller],
+    [altitudeCtrl],
   );
 
   const onNodeContextMenu: NodeMouseHandler = useCallback(
     (event, node) => {
+      event.preventDefault();
       const nodeType = getNodeTypeFromId(node.id);
       if (nodeType) {
-        controller.handleNodeContextMenu(node.id, nodeType, event as unknown as React.MouseEvent);
+        const mouseEvent = event as unknown as React.MouseEvent;
+        dispatch({
+          type: 'graph/showContextMenu',
+          payload: {
+            visible: true,
+            x: mouseEvent.clientX,
+            y: mouseEvent.clientY,
+            nodeId: node.id,
+            nodeType,
+          },
+        });
       }
     },
-    [controller],
+    [dispatch],
   );
 
   const onNodeMouseEnter: NodeMouseHandler = useCallback(
@@ -108,14 +149,24 @@ function GraphEngineInner() {
   }, [dispatch]);
 
   const onPaneClick = useCallback(() => {
-    controller.handlePaneClick();
-  }, [controller]);
+    dispatch(deselectAll());
+    dispatch(hideContextMenu());
+  }, [dispatch]);
 
-  // -- Stats overlay --
-  const statsText = `${nodeCount} nodes · ${edgeCount} edges`;
+  // Handle keyboard escape for altitude ascent
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key === 'Escape' && altitudeCtrl.canAscend) {
+        altitudeCtrl.handleAscend();
+      }
+    },
+    [altitudeCtrl],
+  );
+
+  const statsText = `${ALTITUDE_LABELS[altitude]} · ${nodeCount} nodes · ${edgeCount} edges`;
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative" onKeyDown={onKeyDown} tabIndex={0}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -149,21 +200,15 @@ function GraphEngineInner() {
           className="!bg-[var(--surface-primary)]/80 !backdrop-blur-xl !border-white/10 !rounded-lg"
           nodeColor={(node) => {
             const type = getNodeTypeFromId(node.id);
-            const colorMap: Record<string, string> = {
-              industry: '#3b82f6',
-              useCase: '#f59e0b',
-              skeleton: '#a855f7',
-              variant: '#06b6d4',
-              certification: '#10b981',
-              deployment: '#6366f1',
-              risk: '#ef4444',
-              marketplace: '#ec4899',
-            };
-            return colorMap[type ?? ''] ?? '#6b7280';
+            return miniMapColorMap[type ?? ''] ?? '#6b7280';
           }}
           maskColor="rgba(0,0,0,0.6)"
         />
       </ReactFlow>
+
+      {/* Altitude Navigation */}
+      <AltitudeBreadcrumb />
+      <AltitudeIndicator />
 
       {/* Simulation Banner (top) */}
       <SimulationBanner />

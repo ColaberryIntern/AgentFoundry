@@ -246,6 +246,25 @@ export function getNodeTypeFromId(id: string): GraphNodeType | null {
     deploy: 'deployment',
     risk: 'risk',
     market: 'marketplace',
+    indcluster: 'industryCluster',
+    uccluster: 'useCaseCluster',
+    skcluster: 'stackCluster',
   };
   return map[prefix] ?? null;
+}
+
+/**
+ * Check if a node ID represents a cluster (aggregate) node.
+ */
+export function isClusterNodeId(id: string): boolean {
+  return id.startsWith('indcluster-') || id.startsWith('uccluster-') || id.startsWith('skcluster-');
+}
+
+/**
+ * Extract the entity ID from a cluster node ID.
+ * e.g., 'indcluster-51' → '51', 'uccluster-abc123' → 'abc123'
+ */
+export function extractClusterEntityId(id: string): string {
+  const dashIdx = id.indexOf('-');
+  return dashIdx >= 0 ? id.slice(dashIdx + 1) : id;
 }
