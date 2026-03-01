@@ -14,6 +14,37 @@ import {
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchMarketSignals } from '../../store/complianceSlice';
 import { fetchIndustries } from '../../store/registrySlice';
+import type { MarketSignal } from '../../types/compliance';
+
+function generateSampleSignals(industry: string): MarketSignal[] {
+  const now = new Date();
+  const trends: ('up' | 'down' | 'stable')[] = [
+    'up',
+    'up',
+    'stable',
+    'up',
+    'down',
+    'stable',
+    'up',
+    'up',
+    'stable',
+    'up',
+    'up',
+    'down',
+  ];
+  return Array.from({ length: 12 }, (_, i) => {
+    const date = new Date(now);
+    date.setDate(date.getDate() - (11 - i) * 7);
+    const base = 50 + i * 3 + Math.sin(i) * 10;
+    return {
+      date: date.toISOString(),
+      value: Math.round(base * 10) / 10,
+      trend: trends[i],
+      confidence: 0.6 + Math.random() * 0.35,
+      industry,
+    };
+  });
+}
 
 ChartJS.register(
   CategoryScale,
@@ -82,6 +113,8 @@ function MarketSignals() {
   const marketSignals = rawSignals ?? [];
   const industries = rawIndustries ?? [];
   const [selectedIndustry, setSelectedIndustry] = useState('Finance');
+  const [sampleSignals, setSampleSignals] = useState<MarketSignal[]>([]);
+  const [isSampleData, setIsSampleData] = useState(false);
   const chartRef = useRef<ChartJS<'line'>>(null);
 
   // Load NAICS sectors on mount
@@ -100,10 +133,13 @@ function MarketSignals() {
         }))
       : FALLBACK_INDUSTRIES.map((name) => ({ value: name, label: name }));
 
+  // Use real data if available, otherwise sample data
+  const displaySignals = marketSignals.length > 0 ? marketSignals : sampleSignals;
+
   // Determine overall trend from last few signals
   const overallTrend = (() => {
-    if (marketSignals.length < 2) return 'stable';
-    const lastFew = marketSignals.slice(-3);
+    if (displaySignals.length < 2) return 'stable';
+    const lastFew = displaySignals.slice(-3);
     const upCount = lastFew.filter((s) => s.trend === 'up').length;
     const downCount = lastFew.filter((s) => s.trend === 'down').length;
     if (upCount > downCount) return 'up';
@@ -113,14 +149,22 @@ function MarketSignals() {
 
   // Average confidence
   const avgConfidence =
-    marketSignals.length > 0
+    displaySignals.length > 0
       ? Math.round(
-          (marketSignals.reduce((sum, s) => sum + s.confidence, 0) / marketSignals.length) * 100,
+          (displaySignals.reduce((sum, s) => sum + s.confidence, 0) / displaySignals.length) * 100,
         )
       : 0;
 
   const handleAnalyze = () => {
-    dispatch(fetchMarketSignals({ industry: selectedIndustry }));
+    setIsSampleData(false);
+    setSampleSignals([]);
+    dispatch(fetchMarketSignals({ industry: selectedIndustry })).then((result) => {
+      if (result.meta.requestStatus === 'rejected') {
+        const sample = generateSampleSignals(selectedIndustry);
+        setSampleSignals(sample);
+        setIsSampleData(true);
+      }
+    });
   };
 
   // Cleanup chart on unmount
@@ -133,14 +177,14 @@ function MarketSignals() {
   }, []);
 
   const chartData = {
-    labels: marketSignals.map((s) => {
+    labels: displaySignals.map((s) => {
       const date = new Date(s.date);
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }),
     datasets: [
       {
         label: 'Market Signal Value',
-        data: marketSignals.map((s) => s.value),
+        data: displaySignals.map((s) => s.value),
         borderColor: 'rgb(59, 130, 246)',
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         fill: true,
@@ -150,7 +194,7 @@ function MarketSignals() {
       },
       {
         label: 'Confidence',
-        data: marketSignals.map((s) => s.confidence * 100),
+        data: displaySignals.map((s) => s.confidence * 100),
         borderColor: 'rgb(16, 185, 129)',
         backgroundColor: 'rgba(16, 185, 129, 0.05)',
         fill: false,
@@ -234,14 +278,36 @@ function MarketSignals() {
         </div>
       </div>
 
-      {error && (
+      {error && !isSampleData && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
           <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
         </div>
       )}
 
+      {isSampleData && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-center gap-2">
+          <svg
+            className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <p className="text-sm text-blue-800 dark:text-blue-400">
+            Showing sample data — AI model server not connected. Deploy the model server for live
+            predictions.
+          </p>
+        </div>
+      )}
+
       {/* Summary indicators */}
-      {marketSignals.length > 0 && (
+      {displaySignals.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Overall Trend</p>
@@ -271,14 +337,14 @@ function MarketSignals() {
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Data Points</p>
             <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              {marketSignals.length}
+              {displaySignals.length}
             </span>
           </div>
         </div>
       )}
 
       {/* Chart */}
-      {marketSignals.length > 0 && (
+      {displaySignals.length > 0 && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
           <div className="h-64 sm:h-80">
             <Line ref={chartRef} data={chartData} options={chartOptions} />
@@ -287,7 +353,7 @@ function MarketSignals() {
       )}
 
       {/* Empty state */}
-      {marketSignals.length === 0 && !marketSignalsLoading && (
+      {displaySignals.length === 0 && !marketSignalsLoading && (
         <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
           <svg
             className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3"
@@ -309,7 +375,7 @@ function MarketSignals() {
       )}
 
       {/* Individual signal details */}
-      {marketSignals.length > 0 && (
+      {displaySignals.length > 0 && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
@@ -317,7 +383,7 @@ function MarketSignals() {
             </h4>
           </div>
           <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-60 overflow-y-auto">
-            {marketSignals.map((signal, idx) => (
+            {displaySignals.map((signal, idx) => (
               <div key={idx} className="px-4 py-3 flex items-center gap-4">
                 <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
                   {new Date(signal.date).toLocaleDateString()}

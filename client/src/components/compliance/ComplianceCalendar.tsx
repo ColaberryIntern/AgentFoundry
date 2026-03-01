@@ -75,7 +75,7 @@ function ComplianceCalendar() {
     error,
   } = useAppSelector((state) => state.compliance);
   const calendarEvents = rawEvents ?? [];
-  const upcomingDeadlines = rawDeadlines ?? [];
+  const rawUpcoming = rawDeadlines ?? [];
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -137,6 +137,20 @@ function ComplianceCalendar() {
   };
 
   const today = new Date();
+
+  // Fall back to calendar events when dedicated upcoming deadlines are empty
+  const upcomingDeadlines =
+    rawUpcoming.length > 0
+      ? rawUpcoming
+      : calendarEvents
+          .filter(
+            (evt) =>
+              new Date(evt.date).getTime() >=
+              new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime(),
+          )
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(0, 10);
+
   const isToday = (day: number) =>
     today.getFullYear() === currentYear &&
     today.getMonth() === currentMonth &&
@@ -410,7 +424,7 @@ function ComplianceCalendar() {
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
               <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                Upcoming Deadlines
+                Upcoming Events
               </h4>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Next 30 days</p>
             </div>
@@ -422,7 +436,7 @@ function ComplianceCalendar() {
               )}
               {upcomingDeadlines.length === 0 && !calendarLoading && (
                 <div className="p-4 text-center text-xs text-gray-500 dark:text-gray-400">
-                  No upcoming deadlines
+                  No upcoming events. Use &quot;Add Event&quot; to create compliance deadlines.
                 </div>
               )}
               {upcomingDeadlines.map((evt) => {

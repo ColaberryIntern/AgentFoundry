@@ -5,7 +5,8 @@ interface AgentMetricsChartProps {
 }
 
 function AgentMetricsChart({ metrics }: AgentMetricsChartProps) {
-  const { requests, errors, avg_latency, uptime } = metrics.metrics;
+  const m = metrics?.metrics ?? { requests: 0, errors: 0, avg_latency: 0, uptime: 0 };
+  const { requests, errors, avg_latency, uptime } = m;
 
   const errorRate = requests > 0 ? ((errors / requests) * 100).toFixed(2) : '0.00';
 

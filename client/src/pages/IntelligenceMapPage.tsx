@@ -141,12 +141,17 @@ export default function IntelligenceMapPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {industries.slice(0, 12).map((ind) => {
+                const industryUseCases = useCases.filter((uc) =>
+                  uc.industryScope?.some(
+                    (code: string) => code === ind.code || code.startsWith(ind.code),
+                  ),
+                );
                 const industryVariants = variants.filter((v) => v.industryCode === ind.code);
                 return (
                   <div
                     key={ind.code}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-                    onClick={() => navigate('/use-cases')}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/use-cases?industry=${ind.code}`)}
                   >
                     <div className="w-10 h-10 rounded-lg bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 text-xs font-bold">
                       {ind.code}
@@ -156,7 +161,9 @@ export default function IntelligenceMapPage() {
                         {ind.title}
                       </div>
                       <div className="text-xs text-[var(--text-muted)]">
-                        {industryVariants.length} agent{industryVariants.length !== 1 ? 's' : ''}
+                        {industryUseCases.length} use case{industryUseCases.length !== 1 ? 's' : ''}
+                        {industryVariants.length > 0 &&
+                          ` · ${industryVariants.length} agent${industryVariants.length !== 1 ? 's' : ''}`}
                       </div>
                     </div>
                     {industryVariants.length > 0 && (
@@ -178,10 +185,10 @@ export default function IntelligenceMapPage() {
           )}
           {industries.length > 12 && (
             <button
-              onClick={() => navigate('/use-cases')}
+              onClick={() => navigate('/taxonomy')}
               className="mt-4 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
-              View all {industries.length} industries
+              Browse all {industries.length} industries
             </button>
           )}
         </GlassCard>

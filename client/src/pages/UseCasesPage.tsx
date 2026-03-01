@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { registryApi } from '../services/registryApi';
 import { GlassCard } from '../components/ui/GlassCard';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -33,6 +34,9 @@ interface UseCaseItem {
 }
 
 export default function UseCasesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const industryFilter = searchParams.get('industry') || '';
+
   const [useCases, setUseCases] = useState<UseCaseItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -42,28 +46,43 @@ export default function UseCasesPage() {
   const [status, setStatus] = useState<StatusFilter>('');
   const [selected, setSelected] = useState<UseCaseItem | null>(null);
 
+  const clearIndustryFilter = () => {
+    setSearchParams((prev) => {
+      prev.delete('industry');
+      return prev;
+    });
+  };
+
   useEffect(() => {
     setLoading(true);
     setError(null);
     registryApi
       .getUseCases({
-        page,
-        limit: 20,
+        page: industryFilter ? 1 : page,
+        limit: industryFilter ? 100 : 20,
         ...(status ? { status } : {}),
         ...(monetization ? { monetization_type: monetization } : {}),
       })
       .then((res) => {
-        setUseCases(res.data?.data || []);
-        setTotal(res.data?.pagination?.total || 0);
+        let items: UseCaseItem[] = res.data?.data || [];
+        if (industryFilter) {
+          items = items.filter((uc) =>
+            uc.industryScope?.some(
+              (code) => code === industryFilter || code.startsWith(industryFilter),
+            ),
+          );
+        }
+        setUseCases(items);
+        setTotal(industryFilter ? items.length : res.data?.pagination?.total || 0);
       })
       .catch(() => {
         setUseCases([]);
         setError('Failed to load use cases. Please try again.');
       })
       .finally(() => setLoading(false));
-  }, [page, monetization, status]);
+  }, [page, monetization, status, industryFilter]);
 
-  const totalPages = Math.ceil(total / 20);
+  const totalPages = Math.ceil(total / (industryFilter ? total || 1 : 20));
 
   return (
     <div className="space-y-6">
@@ -104,6 +123,24 @@ export default function UseCasesPage() {
           <option value="compliance_automation">Compliance Automation</option>
         </select>
         <span className="text-sm text-[var(--text-muted)]">{total} total</span>
+        {industryFilter && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-sm rounded-lg bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400">
+            Industry: {industryFilter}
+            <button
+              onClick={clearIndustryFilter}
+              className="hover:text-blue-900 dark:hover:text-blue-200"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </span>
+        )}
       </div>
 
       {/* Error banner */}
@@ -185,20 +222,42 @@ export default function UseCasesPage() {
                   </div>
                 )}
               </div>
-              {uc.industryScope && uc.industryScope.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {(uc.industryScope as string[]).slice(0, 3).map((code: string) => (
-                    <span
-                      key={code}
-                      className="px-1.5 py-0.5 text-[10px] rounded bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400"
-                    >
-                      {code}
-                    </span>
-                  ))}
-                  {(uc.industryScope as string[]).length > 3 && (
-                    <span className="px-1.5 py-0.5 text-[10px] rounded bg-gray-100 dark:bg-white/5 text-[var(--text-muted)]">
-                      +{(uc.industryScope as string[]).length - 3}
-                    </span>
+              {((uc.regulatoryScope && uc.regulatoryScope.length > 0) ||
+                (uc.industryScope && uc.industryScope.length > 0)) && (
+                <div className="mt-3 space-y-1">
+                  {uc.regulatoryScope && uc.regulatoryScope.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {(uc.regulatoryScope as string[]).slice(0, 4).map((reg: string) => (
+                        <span
+                          key={reg}
+                          className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-100 dark:bg-purple-500/15 text-purple-700 dark:text-purple-400"
+                        >
+                          {reg}
+                        </span>
+                      ))}
+                      {(uc.regulatoryScope as string[]).length > 4 && (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-gray-100 dark:bg-white/5 text-[var(--text-muted)]">
+                          +{(uc.regulatoryScope as string[]).length - 4}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {uc.industryScope && uc.industryScope.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {(uc.industryScope as string[]).slice(0, 3).map((code: string) => (
+                        <span
+                          key={code}
+                          className="px-1.5 py-0.5 text-[10px] rounded bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400"
+                        >
+                          {code}
+                        </span>
+                      ))}
+                      {(uc.industryScope as string[]).length > 3 && (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-gray-100 dark:bg-white/5 text-[var(--text-muted)]">
+                          +{(uc.industryScope as string[]).length - 3}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
@@ -234,8 +293,12 @@ export default function UseCasesPage() {
       <DetailDrawer
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected?.outcomeStatement || ''}
-        subtitle="Use Case Detail"
+        title="Use Case Detail"
+        subtitle={
+          selected?.regulatoryScope?.length
+            ? selected.regulatoryScope.join(', ')
+            : selected?.monetizationType?.replace(/_/g, ' ') || ''
+        }
       >
         {selected && (
           <>
@@ -258,6 +321,27 @@ export default function UseCasesPage() {
                 />
               )}
             </div>
+
+            <DrawerField label="What This Use Case Does">
+              <p className="text-sm text-[var(--text-primary)] leading-relaxed mt-1">
+                {selected.outcomeStatement}
+              </p>
+            </DrawerField>
+
+            {selected.monetizationType && (
+              <DrawerField label="Why It's Needed">
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed mt-1">
+                  {selected.monetizationType === 'cost_reduction' &&
+                    'This use case targets cost reduction by automating compliance workflows and eliminating manual overhead.'}
+                  {selected.monetizationType === 'revenue_generation' &&
+                    'This use case drives revenue generation by enabling new compliance-related services and market opportunities.'}
+                  {selected.monetizationType === 'risk_mitigation' &&
+                    'This use case focuses on risk mitigation by identifying and addressing regulatory exposure before it becomes a liability.'}
+                  {selected.monetizationType === 'compliance_automation' &&
+                    'This use case automates compliance processes to ensure continuous regulatory adherence with minimal manual intervention.'}
+                </p>
+              </DrawerField>
+            )}
 
             {selected.measurableKpi && (
               <DrawerField label="Measurable KPI">{selected.measurableKpi}</DrawerField>

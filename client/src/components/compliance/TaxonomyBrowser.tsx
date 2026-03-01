@@ -4,6 +4,61 @@ import { classifyRegulations } from '../../store/complianceSlice';
 import { fetchIndustries } from '../../store/registrySlice';
 import type { TaxonomyCategory, NaicsIndustry } from '../../types/compliance';
 
+function generateSampleClassification(regulations: string[]): TaxonomyCategory[] {
+  const categories: TaxonomyCategory[] = [
+    {
+      id: 'cat-privacy',
+      name: 'Data Privacy & Protection',
+      description:
+        'Regulations governing personal data collection, processing, storage, and deletion rights.',
+      similarity: 0.92,
+      parentCategory: 'Privacy',
+      regulations: [],
+    },
+    {
+      id: 'cat-financial',
+      name: 'Financial Compliance',
+      description:
+        'Financial reporting, audit requirements, and internal controls for publicly traded companies.',
+      similarity: 0.85,
+      parentCategory: 'Finance',
+      regulations: [],
+    },
+    {
+      id: 'cat-health',
+      name: 'Healthcare Privacy',
+      description:
+        'Patient health information protection, electronic health records, and healthcare provider obligations.',
+      similarity: 0.88,
+      parentCategory: 'Healthcare',
+      regulations: [],
+    },
+    {
+      id: 'cat-consumer',
+      name: 'Consumer Rights',
+      description:
+        'Consumer data access, deletion, opt-out rights, and business transparency obligations.',
+      similarity: 0.78,
+      parentCategory: 'Privacy',
+      regulations: [],
+    },
+    {
+      id: 'cat-cybersecurity',
+      name: 'Cybersecurity Standards',
+      description:
+        'Technical security controls, incident response, and risk management frameworks.',
+      similarity: 0.71,
+      parentCategory: 'Security',
+      regulations: [],
+    },
+  ];
+  // Distribute input regulations across categories
+  regulations.forEach((reg, i) => {
+    categories[i % categories.length].regulations.push(reg);
+  });
+  return categories.filter((c) => c.regulations.length > 0);
+}
+
 function CategoryCard({
   category,
   expanded,
@@ -114,24 +169,23 @@ function IndustryNode({ industry, depth = 0 }: { industry: NaicsIndustry; depth?
     <div>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors rounded"
+        className="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors rounded group"
         style={{ paddingLeft: `${12 + depth * 20}px` }}
       >
-        {hasChildren && (
-          <svg
-            className={`w-3 h-3 text-gray-400 transform transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        )}
-        {!hasChildren && <span className="w-3" />}
+        <svg
+          className={`w-3 h-3 text-gray-400 group-hover:text-blue-500 transform transition-transform shrink-0 ${expanded ? 'rotate-90' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 shrink-0">
           {industry.code}
         </span>
-        <span className="text-sm text-gray-900 dark:text-gray-100 truncate">{industry.title}</span>
+        <span className="text-sm text-gray-900 dark:text-gray-100 truncate group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
+          {industry.title}
+        </span>
         <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto shrink-0">
           L{industry.level}
         </span>
@@ -141,6 +195,14 @@ function IndustryNode({ industry, depth = 0 }: { industry: NaicsIndustry; depth?
           {industry.children!.map((child) => (
             <IndustryNode key={child.code} industry={child} depth={depth + 1} />
           ))}
+        </div>
+      )}
+      {expanded && !hasChildren && (
+        <div
+          className="text-xs text-gray-400 dark:text-gray-500 py-2 italic"
+          style={{ paddingLeft: `${32 + depth * 20}px` }}
+        >
+          No sub-industries at this level. Sector {industry.code} — {industry.title}.
         </div>
       )}
     </div>
@@ -163,6 +225,8 @@ function TaxonomyBrowser() {
   const [activeTab, setActiveTab] = useState<'industry' | 'classification'>('industry');
   const [inputText, setInputText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [sampleCategories, setSampleCategories] = useState<TaxonomyCategory[]>([]);
+  const [isSampleData, setIsSampleData] = useState(false);
 
   // Load NAICS industries on mount
   useEffect(() => {
@@ -178,7 +242,15 @@ function TaxonomyBrowser() {
       .filter((line) => line.length > 0);
 
     if (regulations.length > 0) {
-      dispatch(classifyRegulations(regulations));
+      setIsSampleData(false);
+      setSampleCategories([]);
+      dispatch(classifyRegulations(regulations)).then((result) => {
+        if (result.meta.requestStatus === 'rejected') {
+          const sample = generateSampleClassification(regulations);
+          setSampleCategories(sample);
+          setIsSampleData(true);
+        }
+      });
     }
   };
 
@@ -194,8 +266,11 @@ function TaxonomyBrowser() {
     });
   };
 
+  // Use real categories if available, otherwise sample
+  const displayCategories = taxonomyCategories.length > 0 ? taxonomyCategories : sampleCategories;
+
   const expandAll = () => {
-    setExpandedIds(new Set(taxonomyCategories.map((c) => c.id)));
+    setExpandedIds(new Set(displayCategories.map((c) => c.id)));
   };
 
   const collapseAll = () => {
@@ -203,7 +278,7 @@ function TaxonomyBrowser() {
   };
 
   // Group by parent category
-  const grouped = taxonomyCategories.reduce<Record<string, TaxonomyCategory[]>>((acc, cat) => {
+  const grouped = displayCategories.reduce<Record<string, TaxonomyCategory[]>>((acc, cat) => {
     const key = cat.parentCategory || 'Uncategorized';
     if (!acc[key]) acc[key] = [];
     acc[key].push(cat);
@@ -282,13 +357,21 @@ function TaxonomyBrowser() {
       {/* AI Classification Tab */}
       {activeTab === 'classification' && (
         <>
+          {/* Instructions */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <p className="text-sm text-blue-800 dark:text-blue-300">
+              Enter regulation names below (one per line) and click <strong>Classify</strong> to
+              automatically categorize them into compliance taxonomy groups using AI.
+            </p>
+          </div>
+
           {/* Input area */}
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <label
               htmlFor="regulation-input"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
-              Enter regulation names or text (one per line)
+              Regulation names or descriptions (one per line)
             </label>
             <textarea
               id="regulation-input"
@@ -318,18 +401,40 @@ function TaxonomyBrowser() {
             </div>
           </div>
 
-          {error && (
+          {error && !isSampleData && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
               <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
             </div>
           )}
 
+          {isSampleData && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-center gap-2">
+              <svg
+                className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <p className="text-sm text-blue-800 dark:text-blue-400">
+                Showing sample results — AI model server not connected. Deploy the model server for
+                live classification.
+              </p>
+            </div>
+          )}
+
           {/* Results */}
-          {taxonomyCategories.length > 0 && (
+          {displayCategories.length > 0 && (
             <>
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  Classification Results ({taxonomyCategories.length} categories)
+                  Classification Results ({displayCategories.length} categories)
                 </h4>
                 <div className="flex gap-2">
                   <button
@@ -371,7 +476,7 @@ function TaxonomyBrowser() {
           )}
 
           {/* Empty state */}
-          {taxonomyCategories.length === 0 && !taxonomyLoading && (
+          {displayCategories.length === 0 && !taxonomyLoading && (
             <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
               <svg
                 className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-3"
