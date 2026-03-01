@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { DashboardData } from '../../services/dashboardApi';
 
 interface MetricsCardsProps {
@@ -46,6 +47,7 @@ function MetricsCards({ dashboard }: MetricsCardsProps) {
       iconBg: complianceRateBg(dashboard.complianceRate),
       iconColor: complianceRateColor(dashboard.complianceRate),
       valueColor: complianceRateColor(dashboard.complianceRate),
+      link: '/taxonomy',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -66,6 +68,7 @@ function MetricsCards({ dashboard }: MetricsCardsProps) {
         dashboard.openIssues > 0
           ? 'text-red-600 dark:text-red-400'
           : 'text-gray-900 dark:text-gray-100',
+      link: '/orchestrator',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -86,6 +89,7 @@ function MetricsCards({ dashboard }: MetricsCardsProps) {
         dashboard.alertsCount > 0
           ? 'text-yellow-600 dark:text-yellow-400'
           : 'text-gray-900 dark:text-gray-100',
+      link: '/notifications',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -103,6 +107,7 @@ function MetricsCards({ dashboard }: MetricsCardsProps) {
       iconBg: 'bg-primary-100 dark:bg-primary-900/30',
       iconColor: 'text-primary-600 dark:text-primary-400',
       valueColor: 'text-gray-900 dark:text-gray-100',
+      link: '/system-health',
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -119,20 +124,29 @@ function MetricsCards({ dashboard }: MetricsCardsProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map((card) => (
-        <div
+        <Link
           key={card.label}
-          className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5 flex items-center gap-4"
+          to={card.link}
+          className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5 flex items-center gap-4 hover:shadow-md hover:border-primary-200 dark:hover:border-primary-800 transition-all group"
         >
           <div
             className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${card.iconBg} ${card.iconColor}`}
           >
             {card.icon}
           </div>
-          <div>
+          <div className="flex-1">
             <p className={`text-2xl font-bold ${card.valueColor}`}>{card.value}</p>
             <p className="text-sm text-gray-500 dark:text-gray-400">{card.label}</p>
           </div>
-        </div>
+          <svg
+            className="w-4 h-4 text-gray-300 dark:text-gray-600 group-hover:text-primary-400 transition-colors flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </Link>
       ))}
     </div>
   );

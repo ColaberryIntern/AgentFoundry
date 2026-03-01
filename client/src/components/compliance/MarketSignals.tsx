@@ -73,10 +73,14 @@ function getTrendLabel(trend: 'up' | 'down' | 'stable'): string {
 
 function MarketSignals() {
   const dispatch = useAppDispatch();
-  const { marketSignals, marketSignalsLoading, error } = useAppSelector(
-    (state) => state.compliance,
-  );
-  const { industries } = useAppSelector((state) => state.registry);
+  const {
+    marketSignals: rawSignals,
+    marketSignalsLoading,
+    error,
+  } = useAppSelector((state) => state.compliance);
+  const { industries: rawIndustries } = useAppSelector((state) => state.registry);
+  const marketSignals = rawSignals ?? [];
+  const industries = rawIndustries ?? [];
   const [selectedIndustry, setSelectedIndustry] = useState('Finance');
   const chartRef = useRef<ChartJS<'line'>>(null);
 

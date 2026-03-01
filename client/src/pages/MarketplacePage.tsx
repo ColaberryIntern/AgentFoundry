@@ -2,10 +2,23 @@ import { useEffect, useState } from 'react';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { fetchMarketplace } from '../store/orchestratorSlice';
 import { GlassCard } from '../components/ui/GlassCard';
+import { StatusBadge } from '../components/ui/StatusBadge';
 import { MarketplaceCard } from '../components/orchestrator/MarketplaceCard';
-import type { MarketplaceStatus } from '../types/orchestrator';
+import { DetailDrawer, DrawerField, DrawerIdField } from '../components/ui/DetailDrawer';
+import type { MarketplaceSubmission, MarketplaceStatus } from '../types/orchestrator';
 
 type StatusFilter = '' | MarketplaceStatus;
+
+const statusVariantMap: Record<string, string> = {
+  draft: 'draft',
+  submitted: 'info',
+  under_review: 'pending',
+  testing: 'running',
+  approved: 'certified',
+  rejected: 'failed',
+  published: 'active',
+  delisted: 'stopped',
+};
 
 export default function MarketplacePage() {
   const dispatch = useAppDispatch();
@@ -14,6 +27,7 @@ export default function MarketplacePage() {
   );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
   const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<MarketplaceSubmission | null>(null);
 
   useEffect(() => {
     dispatch(
@@ -89,7 +103,11 @@ export default function MarketplacePage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {marketplace.map((submission) => (
-            <MarketplaceCard key={submission.id} submission={submission} />
+            <MarketplaceCard
+              key={submission.id}
+              submission={submission}
+              onClick={() => setSelected(submission)}
+            />
           ))}
         </div>
       )}
@@ -116,6 +134,112 @@ export default function MarketplacePage() {
           </button>
         </div>
       )}
+
+      {/* Detail drawer */}
+      <DetailDrawer
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected?.submissionName || ''}
+        subtitle="Marketplace Submission"
+      >
+        {selected && (
+          <>
+            <StatusBadge
+              variant={(statusVariantMap[selected.status] || 'unknown') as 'draft'}
+              label={selected.status.replace(/_/g, ' ')}
+              size="md"
+            />
+
+            {selected.description && (
+              <DrawerField label="Description">{selected.description}</DrawerField>
+            )}
+
+            <DrawerField label="Submitter">
+              <span className="font-mono text-xs">{selected.submitterId}</span>
+            </DrawerField>
+
+            <DrawerField label="Certification Required">
+              {selected.certificationRequired ? (
+                <span className="px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400 text-xs font-medium">
+                  Required
+                </span>
+              ) : (
+                <span className="text-[var(--text-muted)]">Not required</span>
+              )}
+            </DrawerField>
+
+            {selected.documentationUrl && (
+              <DrawerField label="Documentation">
+                <a
+                  href={selected.documentationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline text-sm break-all"
+                >
+                  {selected.documentationUrl}
+                </a>
+              </DrawerField>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              {selected.submittedAt && (
+                <DrawerField label="Submitted">
+                  {new Date(selected.submittedAt).toLocaleDateString()}
+                </DrawerField>
+              )}
+              {selected.reviewedAt && (
+                <DrawerField label="Reviewed">
+                  {new Date(selected.reviewedAt).toLocaleDateString()}
+                </DrawerField>
+              )}
+              {selected.publishedAt && (
+                <DrawerField label="Published">
+                  {new Date(selected.publishedAt).toLocaleDateString()}
+                </DrawerField>
+              )}
+            </div>
+
+            {selected.reviewNotes && selected.reviewNotes.length > 0 && (
+              <DrawerField label="Review Notes">
+                <div className="mt-1 space-y-2">
+                  {(
+                    selected.reviewNotes as Array<{
+                      reviewer?: string;
+                      note?: string;
+                      date?: string;
+                    }>
+                  ).map((note, i) => (
+                    <div
+                      key={i}
+                      className="p-2 rounded-lg bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 text-xs"
+                    >
+                      {note.note || JSON.stringify(note)}
+                      {note.date && (
+                        <span className="text-[var(--text-muted)] ml-2">
+                          {new Date(note.date).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </DrawerField>
+            )}
+
+            {selected.listingMetadata && (
+              <DrawerField label="Listing Metadata">
+                <pre className="mt-1 p-3 rounded-lg bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/5 text-xs font-mono overflow-x-auto max-h-40 overflow-y-auto">
+                  {JSON.stringify(selected.listingMetadata, null, 2)}
+                </pre>
+              </DrawerField>
+            )}
+
+            {selected.agentVariantId && (
+              <DrawerIdField label="Agent Variant ID" value={selected.agentVariantId} />
+            )}
+            <DrawerIdField label="Submission ID" value={selected.id} />
+          </>
+        )}
+      </DetailDrawer>
     </div>
   );
 }

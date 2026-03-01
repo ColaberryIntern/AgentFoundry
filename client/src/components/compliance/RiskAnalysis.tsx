@@ -141,8 +141,12 @@ function RiskMatrix({ risks }: { risks: RiskAnalysisResult[] }) {
 function RiskAnalysis() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const { complianceGaps, analysisLoading } = useAppSelector((state) => state.recommendations);
-  const { riskAnalysis, error } = useAppSelector((state) => state.compliance);
+  const { complianceGaps: rawGaps, analysisLoading } = useAppSelector(
+    (state) => state.recommendations,
+  );
+  const { riskAnalysis: rawRisk, error } = useAppSelector((state) => state.compliance);
+  const complianceGaps = rawGaps ?? [];
+  const riskAnalysis = rawRisk ?? [];
 
   const [sortField, setSortField] = useState<SortField>('riskScore');
   const [sortDir, setSortDir] = useState<SortDir>('desc');

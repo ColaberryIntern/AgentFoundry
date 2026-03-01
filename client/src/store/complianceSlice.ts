@@ -158,10 +158,10 @@ const complianceSlice = createSlice({
     });
     builder.addCase(fetchCalendarEvents.fulfilled, (state, action) => {
       state.calendarLoading = false;
-      state.calendarEvents = action.payload.events;
-      state.calendarTotal = action.payload.total;
-      state.calendarPage = action.payload.page;
-      state.calendarLimit = action.payload.limit;
+      state.calendarEvents = action.payload?.events ?? [];
+      state.calendarTotal = action.payload?.total ?? 0;
+      state.calendarPage = action.payload?.page ?? 1;
+      state.calendarLimit = action.payload?.limit ?? 20;
     });
     builder.addCase(fetchCalendarEvents.rejected, (state, action) => {
       state.calendarLoading = false;
@@ -175,7 +175,7 @@ const complianceSlice = createSlice({
     });
     builder.addCase(fetchUpcomingDeadlines.fulfilled, (state, action) => {
       state.loading = false;
-      state.upcomingDeadlines = action.payload.events;
+      state.upcomingDeadlines = action.payload?.events ?? [];
     });
     builder.addCase(fetchUpcomingDeadlines.rejected, (state, action) => {
       state.loading = false;
@@ -222,7 +222,7 @@ const complianceSlice = createSlice({
     });
     builder.addCase(fetchMarketSignals.fulfilled, (state, action) => {
       state.marketSignalsLoading = false;
-      state.marketSignals = action.payload.signals;
+      state.marketSignals = action.payload?.signals ?? [];
     });
     builder.addCase(fetchMarketSignals.rejected, (state, action) => {
       state.marketSignalsLoading = false;
@@ -236,7 +236,7 @@ const complianceSlice = createSlice({
     });
     builder.addCase(classifyRegulations.fulfilled, (state, action) => {
       state.taxonomyLoading = false;
-      state.taxonomyCategories = action.payload.categories;
+      state.taxonomyCategories = action.payload?.categories ?? [];
     });
     builder.addCase(classifyRegulations.rejected, (state, action) => {
       state.taxonomyLoading = false;

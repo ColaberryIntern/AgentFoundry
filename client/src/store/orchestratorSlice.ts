@@ -265,7 +265,7 @@ const orchestratorSlice = createSlice({
       })
       .addCase(fetchDashboard.fulfilled, (state, action) => {
         state.dashboardLoading = false;
-        state.dashboard = action.payload.data;
+        state.dashboard = action.payload?.data ?? null;
       })
       .addCase(fetchDashboard.rejected, (state, action) => {
         state.dashboardLoading = false;
@@ -280,8 +280,8 @@ const orchestratorSlice = createSlice({
       })
       .addCase(fetchIntents.fulfilled, (state, action) => {
         state.intentsLoading = false;
-        state.intents = action.payload.data;
-        state.intentsTotal = action.payload.pagination.total;
+        state.intents = action.payload?.data ?? [];
+        state.intentsTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchIntents.rejected, (state, action) => {
         state.intentsLoading = false;
@@ -296,8 +296,8 @@ const orchestratorSlice = createSlice({
       })
       .addCase(fetchActions.fulfilled, (state, action) => {
         state.actionsLoading = false;
-        state.actions = action.payload.data;
-        state.actionsTotal = action.payload.pagination.total;
+        state.actions = action.payload?.data ?? [];
+        state.actionsTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchActions.rejected, (state, action) => {
         state.actionsLoading = false;
@@ -312,7 +312,7 @@ const orchestratorSlice = createSlice({
       })
       .addCase(fetchSettings.fulfilled, (state, action) => {
         state.settingsLoading = false;
-        state.settings = action.payload.data;
+        state.settings = action.payload?.data ?? [];
       })
       .addCase(fetchSettings.rejected, (state, action) => {
         state.settingsLoading = false;
@@ -322,7 +322,8 @@ const orchestratorSlice = createSlice({
     // Update Setting
     builder
       .addCase(updateSetting.fulfilled, (state, action) => {
-        const updated = action.payload.data;
+        const updated = action.payload?.data;
+        if (!updated) return;
         const idx = state.settings.findIndex((s) => s.settingKey === updated.settingKey);
         if (idx >= 0) state.settings[idx] = updated;
       })
@@ -338,8 +339,8 @@ const orchestratorSlice = createSlice({
       })
       .addCase(fetchViolations.fulfilled, (state, action) => {
         state.violationsLoading = false;
-        state.violations = action.payload.data;
-        state.violationsTotal = action.payload.pagination.total;
+        state.violations = action.payload?.data ?? [];
+        state.violationsTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchViolations.rejected, (state, action) => {
         state.violationsLoading = false;
@@ -354,8 +355,8 @@ const orchestratorSlice = createSlice({
       })
       .addCase(fetchScans.fulfilled, (state, action) => {
         state.scansLoading = false;
-        state.scans = action.payload.data;
-        state.scansTotal = action.payload.pagination.total;
+        state.scans = action.payload?.data ?? [];
+        state.scansTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchScans.rejected, (state, action) => {
         state.scansLoading = false;
@@ -370,8 +371,8 @@ const orchestratorSlice = createSlice({
       })
       .addCase(fetchMarketplace.fulfilled, (state, action) => {
         state.marketplaceLoading = false;
-        state.marketplace = action.payload.data;
-        state.marketplaceTotal = action.payload.pagination.total;
+        state.marketplace = action.payload?.data ?? [];
+        state.marketplaceTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchMarketplace.rejected, (state, action) => {
         state.marketplaceLoading = false;
@@ -381,7 +382,8 @@ const orchestratorSlice = createSlice({
     // Approve/Reject Intent — refresh dashboard after mutation
     builder
       .addCase(approveIntent.fulfilled, (state, action) => {
-        const updated = action.payload.data;
+        const updated = action.payload?.data;
+        if (!updated) return;
         const idx = state.intents.findIndex((i) => i.id === updated.id);
         if (idx >= 0) state.intents[idx] = updated;
       })
@@ -391,7 +393,8 @@ const orchestratorSlice = createSlice({
 
     builder
       .addCase(rejectIntent.fulfilled, (state, action) => {
-        const updated = action.payload.data;
+        const updated = action.payload?.data;
+        if (!updated) return;
         const idx = state.intents.findIndex((i) => i.id === updated.id);
         if (idx >= 0) state.intents[idx] = updated;
       })
@@ -402,7 +405,8 @@ const orchestratorSlice = createSlice({
     // Approve/Reject Action
     builder
       .addCase(approveAction.fulfilled, (state, action) => {
-        const updated = action.payload.data;
+        const updated = action.payload?.data;
+        if (!updated) return;
         const idx = state.actions.findIndex((a) => a.id === updated.id);
         if (idx >= 0) state.actions[idx] = updated;
       })
@@ -412,7 +416,8 @@ const orchestratorSlice = createSlice({
 
     builder
       .addCase(rejectAction.fulfilled, (state, action) => {
-        const updated = action.payload.data;
+        const updated = action.payload?.data;
+        if (!updated) return;
         const idx = state.actions.findIndex((a) => a.id === updated.id);
         if (idx >= 0) state.actions[idx] = updated;
       })
@@ -423,7 +428,8 @@ const orchestratorSlice = createSlice({
     // Resolve Violation
     builder
       .addCase(resolveViolation.fulfilled, (state, action) => {
-        const updated = action.payload.data;
+        const updated = action.payload?.data;
+        if (!updated) return;
         const idx = state.violations.findIndex((v) => v.id === updated.id);
         if (idx >= 0) state.violations[idx] = updated;
       })

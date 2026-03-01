@@ -207,10 +207,10 @@ const agentsSlice = createSlice({
     });
     builder.addCase(fetchAgents.fulfilled, (state, action) => {
       state.loading = false;
-      state.agents = action.payload.agents;
-      state.total = action.payload.total;
-      state.page = action.payload.page;
-      state.limit = action.payload.limit;
+      state.agents = action.payload?.agents ?? [];
+      state.total = action.payload?.total ?? 0;
+      state.page = action.payload?.page ?? 1;
+      state.limit = action.payload?.limit ?? 20;
     });
     builder.addCase(fetchAgents.rejected, (state, action) => {
       state.loading = false;

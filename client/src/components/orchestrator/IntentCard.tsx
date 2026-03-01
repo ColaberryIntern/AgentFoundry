@@ -35,15 +35,27 @@ interface IntentCardProps {
   intent: OrchestratorIntent;
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
+  onClick?: () => void;
   compact?: boolean;
 }
 
-export function IntentCard({ intent, onApprove, onReject, compact = false }: IntentCardProps) {
+export function IntentCard({
+  intent,
+  onApprove,
+  onReject,
+  onClick,
+  compact = false,
+}: IntentCardProps) {
   const showActions =
     (intent.status === 'proposed' || intent.status === 'detected') && (onApprove || onReject);
 
   return (
-    <GlassCard padding={compact ? 'sm' : 'md'} className={compact ? '' : 'space-y-3'}>
+    <GlassCard
+      padding={compact ? 'sm' : 'md'}
+      hover={!!onClick}
+      onClick={onClick}
+      className={compact ? '' : 'space-y-3'}
+    >
       <div className="flex items-start gap-3">
         {/* Type icon */}
         <div

@@ -58,6 +58,7 @@ function NotificationsPage() {
   const { trackPageView } = useAnalytics();
 
   const [page, setPage] = useState(1);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const limit = 20;
 
   useEffect(() => {
@@ -167,47 +168,118 @@ function NotificationsPage() {
                 key={notification.id}
                 onClick={() => {
                   if (!notification.isRead) handleMarkAsRead(notification.id);
+                  setExpandedId(expandedId === notification.id ? null : notification.id);
                 }}
-                className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 flex items-start gap-4 transition-colors ${
+                className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
                   !notification.isRead
-                    ? 'border-l-4 border-l-primary-500 bg-primary-50/50 dark:bg-primary-900/10 cursor-pointer'
+                    ? 'border-l-4 border-l-primary-500 bg-primary-50/50 dark:bg-primary-900/10'
                     : ''
                 }`}
               >
-                <div
-                  className={`flex-shrink-0 mt-0.5 px-2 py-1 rounded text-xs font-medium ${typeStyle.bg} ${typeStyle.text}`}
-                >
-                  {typeStyle.label}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3
-                      className={`text-sm font-medium ${
-                        notification.isRead
-                          ? 'text-gray-700 dark:text-gray-300'
-                          : 'text-gray-900 dark:text-gray-100'
-                      }`}
-                    >
-                      {sanitize(notification.title)}
-                    </h3>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap flex-shrink-0">
-                      {formatTimeAgo(notification.createdAt)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {sanitize(notification.message)}
-                  </p>
-                </div>
-                {!notification.isRead && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMarkAsRead(notification.id);
-                    }}
-                    className="flex-shrink-0 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 font-medium whitespace-nowrap"
+                <div className="flex items-start gap-4">
+                  <div
+                    className={`flex-shrink-0 mt-0.5 px-2 py-1 rounded text-xs font-medium ${typeStyle.bg} ${typeStyle.text}`}
                   >
-                    Mark as Read
-                  </button>
+                    {typeStyle.label}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3
+                        className={`text-sm font-medium ${
+                          notification.isRead
+                            ? 'text-gray-700 dark:text-gray-300'
+                            : 'text-gray-900 dark:text-gray-100'
+                        }`}
+                      >
+                        {sanitize(notification.title)}
+                      </h3>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap flex-shrink-0">
+                        {formatTimeAgo(notification.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      {sanitize(notification.message)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {!notification.isRead && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkAsRead(notification.id);
+                        }}
+                        className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 font-medium whitespace-nowrap"
+                      >
+                        Mark as Read
+                      </button>
+                    )}
+                    <svg
+                      className={`w-4 h-4 text-gray-400 transition-transform ${expandedId === notification.id ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Expanded detail */}
+                {expandedId === notification.id && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wider font-medium">
+                          Type
+                        </span>
+                        <p className="text-gray-700 dark:text-gray-300 mt-0.5">
+                          {notification.type?.replace(/_/g, ' ') || 'system'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wider font-medium">
+                          Status
+                        </span>
+                        <p className="text-gray-700 dark:text-gray-300 mt-0.5">
+                          {notification.isRead ? 'Read' : 'Unread'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wider font-medium">
+                          Created
+                        </span>
+                        <p className="text-gray-700 dark:text-gray-300 mt-0.5">
+                          {new Date(notification.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400 dark:text-gray-500 uppercase tracking-wider font-medium">
+                          ID
+                        </span>
+                        <p
+                          className="text-gray-700 dark:text-gray-300 mt-0.5 font-mono truncate"
+                          title={notification.id}
+                        >
+                          {notification.id}
+                        </p>
+                      </div>
+                    </div>
+                    {notification.message && notification.message.length > 100 && (
+                      <div>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider font-medium">
+                          Full Message
+                        </span>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                          {sanitize(notification.message)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             );

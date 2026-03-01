@@ -181,8 +181,8 @@ const registrySlice = createSlice({
       })
       .addCase(fetchIndustries.fulfilled, (state, action) => {
         state.industriesLoading = false;
-        state.industries = action.payload.data;
-        state.industriesTotal = action.payload.pagination.total;
+        state.industries = action.payload?.data ?? [];
+        state.industriesTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchIndustries.rejected, (state, action) => {
         state.industriesLoading = false;
@@ -197,8 +197,8 @@ const registrySlice = createSlice({
       })
       .addCase(fetchTaxonomyNodes.fulfilled, (state, action) => {
         state.taxonomyLoading = false;
-        state.taxonomyNodes = action.payload.data;
-        state.taxonomyTotal = action.payload.pagination.total;
+        state.taxonomyNodes = action.payload?.data ?? [];
+        state.taxonomyTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchTaxonomyNodes.rejected, (state, action) => {
         state.taxonomyLoading = false;
@@ -213,8 +213,8 @@ const registrySlice = createSlice({
       })
       .addCase(fetchUseCases.fulfilled, (state, action) => {
         state.loading = false;
-        state.useCases = action.payload.data;
-        state.useCasesTotal = action.payload.pagination.total;
+        state.useCases = action.payload?.data ?? [];
+        state.useCasesTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchUseCases.rejected, (state, action) => {
         state.loading = false;
@@ -229,7 +229,7 @@ const registrySlice = createSlice({
       })
       .addCase(fetchAgentSkeletons.fulfilled, (state, action) => {
         state.loading = false;
-        state.skeletons = action.payload.data;
+        state.skeletons = action.payload?.data ?? [];
       })
       .addCase(fetchAgentSkeletons.rejected, (state, action) => {
         state.loading = false;
@@ -244,8 +244,8 @@ const registrySlice = createSlice({
       })
       .addCase(fetchAgentVariants.fulfilled, (state, action) => {
         state.variantsLoading = false;
-        state.variants = action.payload.data;
-        state.variantsTotal = action.payload.pagination.total;
+        state.variants = action.payload?.data ?? [];
+        state.variantsTotal = action.payload?.pagination?.total ?? 0;
       })
       .addCase(fetchAgentVariants.rejected, (state, action) => {
         state.variantsLoading = false;
@@ -260,7 +260,7 @@ const registrySlice = createSlice({
       })
       .addCase(fetchIntelligence.fulfilled, (state, action) => {
         state.intelligenceLoading = false;
-        state.intelligence = action.payload.data;
+        state.intelligence = action.payload?.data ?? [];
       })
       .addCase(fetchIntelligence.rejected, (state, action) => {
         state.intelligenceLoading = false;
@@ -275,7 +275,7 @@ const registrySlice = createSlice({
       })
       .addCase(simulateStack.fulfilled, (state, action) => {
         state.loading = false;
-        state.simulation = action.payload.data;
+        state.simulation = action.payload?.data ?? null;
       })
       .addCase(simulateStack.rejected, (state, action) => {
         state.loading = false;

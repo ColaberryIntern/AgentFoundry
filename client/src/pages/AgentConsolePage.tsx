@@ -25,7 +25,8 @@ import AgentDetailPanel from '../components/agents/AgentDetailPanel';
 function AgentConsolePage() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const { agents, loading, error, total } = useAppSelector((state) => state.agents);
+  const { agents: rawAgents, loading, error, total } = useAppSelector((state) => state.agents);
+  const agents = rawAgents ?? [];
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentStack | null>(null);

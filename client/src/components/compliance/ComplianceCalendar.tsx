@@ -68,9 +68,14 @@ function getFirstDayOfWeek(year: number, month: number): number {
 function ComplianceCalendar() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
-  const { calendarEvents, upcomingDeadlines, calendarLoading, error } = useAppSelector(
-    (state) => state.compliance,
-  );
+  const {
+    calendarEvents: rawEvents,
+    upcomingDeadlines: rawDeadlines,
+    calendarLoading,
+    error,
+  } = useAppSelector((state) => state.compliance);
+  const calendarEvents = rawEvents ?? [];
+  const upcomingDeadlines = rawDeadlines ?? [];
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);

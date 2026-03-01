@@ -142,12 +142,12 @@ const recommendationsSlice = createSlice({
     });
     builder.addCase(fetchRecommendations.fulfilled, (state, action) => {
       state.loading = false;
-      state.recommendations = action.payload.recommendations;
+      state.recommendations = action.payload?.recommendations ?? [];
       state.pagination = {
-        total: action.payload.total,
-        page: action.payload.page,
-        limit: action.payload.limit,
-        totalPages: action.payload.totalPages,
+        total: action.payload?.total ?? 0,
+        page: action.payload?.page ?? 1,
+        limit: action.payload?.limit ?? 10,
+        totalPages: action.payload?.totalPages ?? 0,
       };
     });
     builder.addCase(fetchRecommendations.rejected, (state, action) => {
@@ -188,7 +188,7 @@ const recommendationsSlice = createSlice({
     });
     builder.addCase(analyzeCompliance.fulfilled, (state, action) => {
       state.analysisLoading = false;
-      state.complianceGaps = action.payload;
+      state.complianceGaps = action.payload ?? [];
     });
     builder.addCase(analyzeCompliance.rejected, (state, action) => {
       state.analysisLoading = false;
@@ -202,7 +202,7 @@ const recommendationsSlice = createSlice({
     });
     builder.addCase(fetchRegulatoryPredictions.fulfilled, (state, action) => {
       state.predictionsLoading = false;
-      state.regulatoryPredictions = action.payload;
+      state.regulatoryPredictions = action.payload ?? [];
     });
     builder.addCase(fetchRegulatoryPredictions.rejected, (state, action) => {
       state.predictionsLoading = false;

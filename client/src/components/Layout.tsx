@@ -6,6 +6,7 @@ import TopBar from './TopBar';
 import OnboardingFlow from './OnboardingFlow';
 import FeedbackWidget from './FeedbackWidget';
 import NPSSurvey from './NPSSurvey';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 
 const PUBLIC_ROUTES = ['/login', '/register'];
 
@@ -64,7 +65,9 @@ function Layout() {
         `}
       >
         <div className="p-4 sm:p-6 lg:p-8">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </main>
 

@@ -149,10 +149,16 @@ function IndustryNode({ industry, depth = 0 }: { industry: NaicsIndustry; depth?
 
 function TaxonomyBrowser() {
   const dispatch = useAppDispatch();
-  const { taxonomyCategories, taxonomyLoading, error } = useAppSelector(
-    (state) => state.compliance,
+  const {
+    taxonomyCategories: rawCategories,
+    taxonomyLoading,
+    error,
+  } = useAppSelector((state) => state.compliance);
+  const { industries: rawIndustries, industriesLoading } = useAppSelector(
+    (state) => state.registry,
   );
-  const { industries, industriesLoading } = useAppSelector((state) => state.registry);
+  const taxonomyCategories = rawCategories ?? [];
+  const industries = rawIndustries ?? [];
 
   const [activeTab, setActiveTab] = useState<'industry' | 'classification'>('industry');
   const [inputText, setInputText] = useState('');
