@@ -176,32 +176,30 @@ function IndustryNodeComponent({ data }: NodeProps) {
           style={{ top: bubbleSize + 4, left: '50%', transform: 'translateX(-50%)' }}
         >
           <div className="bg-[#0f172a] backdrop-blur-md border border-white/20 rounded-lg px-3 py-2 shadow-2xl shadow-black/50 min-w-[220px] text-white">
-            <div className="text-[10px] text-[var(--text-primary)] font-semibold mb-1 truncate">
-              {d.title}
-            </div>
+            <div className="text-[10px] text-white font-semibold mb-1 truncate">{d.title}</div>
             <div className="grid grid-cols-[auto_minmax(40px,1fr)] gap-x-4 gap-y-0.5 text-[9px]">
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Use Cases</span>
-              <span className="text-[var(--text-primary)] text-right">{d.useCaseCount}</span>
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Agents</span>
-              <span className="text-[var(--text-primary)] text-right">{d.variantCount}</span>
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Certified</span>
+              <span className="text-gray-400 whitespace-nowrap">Use Cases</span>
+              <span className="text-white text-right">{d.useCaseCount}</span>
+              <span className="text-gray-400 whitespace-nowrap">Agents</span>
+              <span className="text-white text-right">{d.variantCount}</span>
+              <span className="text-gray-400 whitespace-nowrap">Certified</span>
               <span className="text-emerald-400 text-right">{d.certifiedCount}</span>
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Active</span>
-              <span className="text-[var(--text-primary)] text-right">{activeDeployments}</span>
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Risk</span>
+              <span className="text-gray-400 whitespace-nowrap">Active</span>
+              <span className="text-white text-right">{activeDeployments}</span>
+              <span className="text-gray-400 whitespace-nowrap">Risk</span>
               <span className="text-right" style={{ color: riskColor }}>
                 {riskIndex}
               </span>
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Coverage</span>
-              <span className="text-[var(--text-primary)] text-right">{coveragePercent}%</span>
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Cert %</span>
+              <span className="text-gray-400 whitespace-nowrap">Coverage</span>
+              <span className="text-white text-right">{coveragePercent}%</span>
+              <span className="text-gray-400 whitespace-nowrap">Cert %</span>
               <span className="text-right" style={{ color: certRingColor }}>
                 {certHealth}%
               </span>
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Volatility</span>
-              <span className="text-[var(--text-primary)] text-right">{volatilityScore}</span>
-              <span className="text-[var(--text-muted)] whitespace-nowrap">Revenue</span>
-              <span className="text-[var(--text-primary)] text-right">{revenueScore}</span>
+              <span className="text-gray-400 whitespace-nowrap">Volatility</span>
+              <span className="text-white text-right">{volatilityScore}</span>
+              <span className="text-gray-400 whitespace-nowrap">Revenue</span>
+              <span className="text-white text-right">{revenueScore}</span>
             </div>
           </div>
         </div>

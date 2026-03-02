@@ -31,6 +31,7 @@ interface GraphSliceState extends GraphUIState {
   hiddenSectorIds: MacroSectorId[];
   activeMetricPanel: string | null;
   demoMode: boolean;
+  showCrossIndustryVariants: boolean;
   _ontologyBackup: OntologyRelationship[] | null;
 }
 
@@ -44,6 +45,7 @@ const initialState: GraphSliceState = {
   hiddenSectorIds: [],
   activeMetricPanel: null,
   demoMode: false,
+  showCrossIndustryVariants: false,
   _ontologyBackup: null,
 };
 
@@ -321,6 +323,11 @@ const graphSlice = createSlice({
       state.demoMode = action.payload;
     },
 
+    // -- Cross-industry variants toggle (STACK level) --
+    toggleCrossIndustryVariants(state) {
+      state.showCrossIndustryVariants = !state.showCrossIndustryVariants;
+    },
+
     loadDemoOntology(state, action: PayloadAction<OntologyRelationship[]>) {
       state._ontologyBackup = state.ontology.relationships;
       state.ontology.relationships = action.payload;
@@ -397,6 +404,7 @@ export const {
   showAllSectors,
   setActiveMetricPanel,
   setDemoMode,
+  toggleCrossIndustryVariants,
   loadDemoOntology,
   restoreLiveOntology,
   enterSimulation,

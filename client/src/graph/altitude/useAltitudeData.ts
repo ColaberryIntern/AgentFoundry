@@ -46,6 +46,11 @@ export function useAltitudeData(): AltitudeDataResult {
   const hiddenSectorIds =
     useAppSelector((s) => (s.graph as unknown as { hiddenSectorIds?: string[] }).hiddenSectorIds) ??
     [];
+  const showCrossIndustryVariants =
+    useAppSelector(
+      (s) =>
+        (s.graph as unknown as { showCrossIndustryVariants?: boolean }).showCrossIndustryVariants,
+    ) ?? false;
   const { industries, useCases, skeletons, variants, intelligence } = useAppSelector(
     (s) => s.registry,
   );
@@ -343,13 +348,22 @@ export function useAltitudeData(): AltitudeDataResult {
       const skeleton = skeletons.find((sk) => sk.id === skId);
       if (!skeleton) return { nodes: [], edges: [] };
 
-      const skVariants = variants.filter((v) => v.skeletonId === skId);
-      const skeletonNode = skeletonToNode(skeleton, skVariants.length);
+      // Scope variants by industryCode when available (carried from descent context)
+      const industryCode = altitudeContext.industryCode;
+      const allSkVariants = variants.filter((v) => v.skeletonId === skId);
+      const scopedVariants = industryCode
+        ? allSkVariants.filter((v) => v.industryCode === industryCode)
+        : allSkVariants;
+
+      const primaryVariants = showCrossIndustryVariants ? allSkVariants : scopedVariants;
+
+      const skeletonNode = skeletonToNode(skeleton, scopedVariants.length);
 
       const nodes: Node[] = [skeletonNode];
 
-      for (const v of skVariants) {
-        nodes.push(variantToNode(v, skeleton.name));
+      for (const v of primaryVariants) {
+        const isCrossIndustry = industryCode != null && v.industryCode !== industryCode;
+        nodes.push(variantToNode(v, skeleton.name, isCrossIndustry ? 'secondary' : 'primary'));
 
         for (const cert of v.certifications ?? []) {
           nodes.push(certificationToNode(cert));
@@ -361,7 +375,7 @@ export function useAltitudeData(): AltitudeDataResult {
 
       const edges = buildAltitudeEdges('STACK', {
         skeletonId: skId,
-        variants: skVariants,
+        variants: primaryVariants,
       });
 
       return { nodes, edges };
@@ -430,6 +444,7 @@ export function useAltitudeData(): AltitudeDataResult {
     marketplace,
     ontologyRelationships,
     hiddenSectorIds,
+    showCrossIndustryVariants,
   ]);
 
   return {

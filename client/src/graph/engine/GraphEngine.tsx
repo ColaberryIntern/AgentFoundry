@@ -21,6 +21,7 @@ import {
   deselectAll,
   hideContextMenu,
   setHoveredMacroSector,
+  toggleCrossIndustryVariants,
 } from '../state/graphSlice';
 import { getMacroSector } from '../altitude/macroSectors';
 import type { MacroSectorId } from '../altitude/macroSectors';
@@ -111,6 +112,11 @@ function GraphEngineInner() {
     useAppSelector(
       (s) => (s.graph as unknown as { focusedSectorId?: MacroSectorId | null }).focusedSectorId,
     ) ?? null;
+  const showCrossIndustryVariants =
+    useAppSelector(
+      (s) =>
+        (s.graph as unknown as { showCrossIndustryVariants?: boolean }).showCrossIndustryVariants,
+    ) ?? false;
 
   // Altitude-scoped data (replaces useGraphData)
   const {
@@ -305,6 +311,17 @@ function GraphEngineInner() {
     [altitudeCtrl],
   );
 
+  // Cross-industry variant count for STACK level toggle
+  const { altitudeContext } = useAppSelector((s) => s.graph);
+  const variants = useAppSelector((s) => s.registry.variants);
+  const crossIndustryCount = useMemo(() => {
+    if (altitude !== 'STACK') return 0;
+    const { skeletonId, industryCode } = altitudeContext;
+    if (!skeletonId || !industryCode) return 0;
+    return variants.filter((v) => v.skeletonId === skeletonId && v.industryCode !== industryCode)
+      .length;
+  }, [altitude, altitudeContext, variants]);
+
   const statsText = `${ALTITUDE_LABELS[altitude]} · ${nodeCount} nodes · ${edgeCount} edges`;
 
   return (
@@ -386,11 +403,23 @@ function GraphEngineInner() {
       {/* Metric Detail Panel (GLOBAL only) */}
       {altitude === 'GLOBAL' && <MetricDetailPanel />}
 
-      {/* Stats bar + Demo toggle */}
+      {/* Stats bar + Demo toggle + Cross-industry toggle */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
         <div className="px-3 py-1 rounded-lg bg-[var(--surface-primary)]/60 backdrop-blur-md border border-white/5 text-[10px] text-[var(--text-muted)]">
           {statsText}
         </div>
+        {altitude === 'STACK' && crossIndustryCount > 0 && (
+          <button
+            onClick={() => dispatch(toggleCrossIndustryVariants())}
+            className={`px-3 py-1 rounded-lg backdrop-blur-md border text-[10px] transition-colors ${
+              showCrossIndustryVariants
+                ? 'bg-purple-500/20 border-purple-400/30 text-purple-300'
+                : 'bg-[var(--surface-primary)]/60 border-white/5 text-[var(--text-muted)] hover:border-purple-400/20 hover:text-purple-300'
+            }`}
+          >
+            {showCrossIndustryVariants ? 'Hide' : 'Show'} cross-industry ({crossIndustryCount})
+          </button>
+        )}
         <DemoModeToggle />
       </div>
     </div>
