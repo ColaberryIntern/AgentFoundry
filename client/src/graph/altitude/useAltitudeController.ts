@@ -8,6 +8,7 @@ import {
   setAltitude,
   setAltitudeAnimating,
   selectNode,
+  setFocusedSector,
 } from '../state/graphSlice';
 import { AltitudeController } from './AltitudeController';
 import {
@@ -16,6 +17,7 @@ import {
   getNodeTypeFromId,
 } from '../engine/nodeTransformers';
 import type { AltitudeLevel, AltitudeContext } from './altitudeTypes';
+import type { MacroSectorId } from './macroSectors';
 
 /**
  * Hook that wraps AltitudeController with Redux dispatch and ReactFlow viewport transitions.
@@ -35,6 +37,23 @@ export function useAltitudeController() {
   }, [reactFlow]);
 
   /**
+   * Extract macroSectorId from a ReactFlow node by ID.
+   */
+  const getNodeSectorId = useCallback(
+    (nodeId: string): MacroSectorId | null => {
+      try {
+        const node = reactFlow.getNode(nodeId);
+        if (!node) return null;
+        const data = node.data as Record<string, unknown>;
+        return (data.macroSectorId as MacroSectorId) ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [reactFlow],
+  );
+
+  /**
    * Handle node click — descend into cluster or select detail node.
    */
   const handleNodeClick = useCallback(
@@ -46,7 +65,20 @@ export function useAltitudeController() {
         // Cluster click → descend
         const entityId = extractClusterEntityId(nodeId);
         dispatch(pushState({ viewport: getViewport(), label: `Descend into ${nodeId}` }));
-        dispatch(descendAltitude({ targetId: entityId, targetType: nodeType }));
+
+        // Capture sector for breadcrumb navigation when descending from GLOBAL
+        if (currentAltitude === 'GLOBAL') {
+          const sectorId = getNodeSectorId(nodeId);
+          dispatch(
+            descendAltitude({
+              targetId: entityId,
+              targetType: nodeType,
+              sectorId: sectorId ?? undefined,
+            }),
+          );
+        } else {
+          dispatch(descendAltitude({ targetId: entityId, targetType: nodeType }));
+        }
 
         // Animated viewport transition
         setTimeout(() => {
@@ -64,7 +96,7 @@ export function useAltitudeController() {
         dispatch(selectNode({ nodeId, nodeType }));
       }
     },
-    [dispatch, getViewport, reactFlow],
+    [dispatch, getViewport, reactFlow, currentAltitude, getNodeSectorId],
   );
 
   /**
@@ -78,7 +110,19 @@ export function useAltitudeController() {
       if (isClusterNodeId(nodeId)) {
         const entityId = extractClusterEntityId(nodeId);
         dispatch(pushState({ viewport: getViewport(), label: `Descend into ${nodeId}` }));
-        dispatch(descendAltitude({ targetId: entityId, targetType: nodeType }));
+
+        if (currentAltitude === 'GLOBAL') {
+          const sectorId = getNodeSectorId(nodeId);
+          dispatch(
+            descendAltitude({
+              targetId: entityId,
+              targetType: nodeType,
+              sectorId: sectorId ?? undefined,
+            }),
+          );
+        } else {
+          dispatch(descendAltitude({ targetId: entityId, targetType: nodeType }));
+        }
       } else if (currentAltitude === 'STACK' && nodeType === 'variant') {
         // At STACK, double-click variant → descend to AGENT
         const entityId = nodeId.replace('variant-', '');
@@ -91,21 +135,32 @@ export function useAltitudeController() {
         setTimeout(() => dispatch(setAltitudeAnimating(false)), 400);
       }, 50);
     },
-    [dispatch, getViewport, reactFlow, currentAltitude],
+    [dispatch, getViewport, reactFlow, currentAltitude, getNodeSectorId],
   );
 
   /**
    * Ascend one altitude level.
+   * When ascending from INDUSTRY → GLOBAL, sets focusedSectorId for intermediate sector view.
    */
   const handleAscend = useCallback(() => {
     if (!AltitudeController.canAscend(currentAltitude)) return;
     dispatch(pushState({ viewport: getViewport(), label: `Ascend from ${currentAltitude}` }));
+
+    // Capture sectorId before ascending (ascend clears some context)
+    const sectorId = altitudeContext.sectorId as MacroSectorId | null;
+
     dispatch(ascendAltitude());
+
+    // When ascending from INDUSTRY, set sector focus for intermediate view
+    if (currentAltitude === 'INDUSTRY' && sectorId) {
+      dispatch(setFocusedSector(sectorId));
+    }
+
     setTimeout(() => {
       reactFlow.fitView({ duration: 400, padding: 0.2 });
       setTimeout(() => dispatch(setAltitudeAnimating(false)), 400);
     }, 50);
-  }, [dispatch, getViewport, reactFlow, currentAltitude]);
+  }, [dispatch, getViewport, reactFlow, currentAltitude, altitudeContext.sectorId]);
 
   /**
    * Jump to a specific altitude level (from breadcrumb).

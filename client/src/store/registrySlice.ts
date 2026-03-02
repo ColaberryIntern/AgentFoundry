@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { registryApi } from '../services/registryApi';
 import type {
   NaicsIndustry,
@@ -14,6 +14,18 @@ import type { AxiosError } from 'axios';
 
 interface ApiErrorResponse {
   error: { code: string; message: string; details?: unknown };
+}
+
+interface RealDataBackup {
+  industries: NaicsIndustry[];
+  industriesTotal: number;
+  useCases: UseCase[];
+  useCasesTotal: number;
+  skeletons: AgentSkeleton[];
+  variants: AgentVariant[];
+  variantsTotal: number;
+  certifications: CertificationRecord[];
+  intelligence: SystemIntelligence[];
 }
 
 interface RegistryState {
@@ -35,6 +47,7 @@ interface RegistryState {
   variantsLoading: boolean;
   intelligenceLoading: boolean;
   error: string | null;
+  _realDataBackup: RealDataBackup | null;
 }
 
 const initialState: RegistryState = {
@@ -56,6 +69,7 @@ const initialState: RegistryState = {
   variantsLoading: false,
   intelligenceLoading: false,
   error: null,
+  _realDataBackup: null,
 };
 
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -171,6 +185,56 @@ const registrySlice = createSlice({
     clearSimulation(state) {
       state.simulation = null;
     },
+    loadDemoData(
+      state,
+      action: PayloadAction<{
+        industries: NaicsIndustry[];
+        useCases: UseCase[];
+        skeletons: AgentSkeleton[];
+        variants: AgentVariant[];
+        certifications: CertificationRecord[];
+        intelligence: SystemIntelligence[];
+      }>,
+    ) {
+      // Backup real data before replacing
+      state._realDataBackup = {
+        industries: state.industries,
+        industriesTotal: state.industriesTotal,
+        useCases: state.useCases,
+        useCasesTotal: state.useCasesTotal,
+        skeletons: state.skeletons,
+        variants: state.variants,
+        variantsTotal: state.variantsTotal,
+        certifications: state.certifications,
+        intelligence: state.intelligence,
+      };
+      // Replace with demo data
+      const d = action.payload;
+      state.industries = d.industries;
+      state.industriesTotal = d.industries.length;
+      state.useCases = d.useCases;
+      state.useCasesTotal = d.useCases.length;
+      state.skeletons = d.skeletons;
+      state.variants = d.variants;
+      state.variantsTotal = d.variants.length;
+      state.certifications = d.certifications;
+      state.intelligence = d.intelligence;
+    },
+    restoreRealData(state) {
+      if (state._realDataBackup) {
+        const b = state._realDataBackup;
+        state.industries = b.industries;
+        state.industriesTotal = b.industriesTotal;
+        state.useCases = b.useCases;
+        state.useCasesTotal = b.useCasesTotal;
+        state.skeletons = b.skeletons;
+        state.variants = b.variants;
+        state.variantsTotal = b.variantsTotal;
+        state.certifications = b.certifications;
+        state.intelligence = b.intelligence;
+        state._realDataBackup = null;
+      }
+    },
   },
   extraReducers: (builder) => {
     // Industries
@@ -284,5 +348,5 @@ const registrySlice = createSlice({
   },
 });
 
-export const { clearError, clearSimulation } = registrySlice.actions;
+export const { clearError, clearSimulation, loadDemoData, restoreRealData } = registrySlice.actions;
 export default registrySlice.reducer;

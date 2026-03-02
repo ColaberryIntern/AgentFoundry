@@ -58,6 +58,7 @@ import { MetricDetailPanel } from '../panels/MetricDetailPanel';
 import { AgentBrainOrb } from '../widgets/AgentBrainOrb';
 import { AltitudeBreadcrumb } from '../altitude/AltitudeBreadcrumb';
 import { AltitudeIndicator } from '../altitude/AltitudeIndicator';
+import { DemoModeToggle } from '../widgets/DemoModeToggle';
 import { ALTITUDE_LABELS } from '../altitude/altitudeTypes';
 
 // Node type registry (detail + cluster nodes)
@@ -364,8 +365,8 @@ function GraphEngineInner() {
       {/* Simulation Banner (top) */}
       <SimulationBanner />
 
-      {/* Global Metrics Strip (GLOBAL only) */}
-      {altitude === 'GLOBAL' && <GlobalMetricsStrip />}
+      {/* Global Metrics Strip */}
+      <GlobalMetricsStrip />
 
       {/* Mode Toolbar overlay */}
       <ModeToolbar />
@@ -388,9 +389,12 @@ function GraphEngineInner() {
       {/* Metric Detail Panel (GLOBAL only) */}
       {altitude === 'GLOBAL' && <MetricDetailPanel />}
 
-      {/* Stats bar */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-lg bg-[var(--surface-primary)]/60 backdrop-blur-md border border-white/5 text-[10px] text-[var(--text-muted)]">
-        {statsText}
+      {/* Stats bar + Demo toggle */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
+        <div className="px-3 py-1 rounded-lg bg-[var(--surface-primary)]/60 backdrop-blur-md border border-white/5 text-[10px] text-[var(--text-muted)]">
+          {statsText}
+        </div>
+        <DemoModeToggle />
       </div>
     </div>
   );

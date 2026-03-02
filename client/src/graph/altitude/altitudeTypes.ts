@@ -29,6 +29,7 @@ export const ALTITUDE_LABELS: Record<AltitudeLevel, string> = {
 // ---------------------------------------------------------------------------
 
 export interface AltitudeContext {
+  sectorId: string | null;
   industryCode: string | null;
   useCaseId: string | null;
   skeletonId: string | null;
@@ -36,6 +37,7 @@ export interface AltitudeContext {
 }
 
 export const EMPTY_ALTITUDE_CONTEXT: AltitudeContext = {
+  sectorId: null,
   industryCode: null,
   useCaseId: null,
   skeletonId: null,
@@ -152,4 +154,7 @@ export interface BreadcrumbItem {
   level: AltitudeLevel;
   label: string;
   context: AltitudeContext;
+  /** When true, clicking navigates to GLOBAL with focusedSectorId set */
+  isSectorCrumb?: boolean;
+  sectorId?: string;
 }

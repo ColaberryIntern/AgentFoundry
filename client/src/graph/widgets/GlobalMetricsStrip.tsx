@@ -80,6 +80,8 @@ export function GlobalMetricsStrip() {
   const { marketplace, dashboard } = useAppSelector((s) => s.orchestrator);
   const { riskAnalysis } = useAppSelector((s) => s.compliance);
 
+  const { currentAltitude, altitudeContext } = useAppSelector((s) => s.graph);
+
   const focusedSectorId =
     useAppSelector(
       (s) => (s.graph as unknown as { focusedSectorId?: MacroSectorId | null }).focusedSectorId,
@@ -93,34 +95,45 @@ export function GlobalMetricsStrip() {
     return new Set(ms.sectorCodes);
   }, [focusedSectorId]);
 
-  // Scope data by focused sector
+  // At INDUSTRY altitude, scope to the focused industry code
+  const industryCodeFilter = useMemo((): string | null => {
+    if (currentAltitude !== 'GLOBAL' && altitudeContext.industryCode) {
+      return altitudeContext.industryCode;
+    }
+    return null;
+  }, [currentAltitude, altitudeContext.industryCode]);
+
+  // Scope data by focused sector or industry
   const scopedIndustries = useMemo(() => {
+    if (industryCodeFilter) {
+      return industries.filter((ind) => ind.code === industryCodeFilter);
+    }
     if (!sectorCodes) return industries;
     return industries.filter((ind) => sectorCodes.has(ind.sector));
-  }, [industries, sectorCodes]);
+  }, [industries, sectorCodes, industryCodeFilter]);
 
   const scopedIndustryCodes = useMemo(() => {
     return new Set(scopedIndustries.map((i) => i.code));
   }, [scopedIndustries]);
 
   const scopedUseCases = useMemo(() => {
-    if (!sectorCodes) return useCases;
+    if (!sectorCodes && !industryCodeFilter) return useCases;
     return useCases.filter((uc) =>
       uc.industryScope?.some((code: string) => scopedIndustryCodes.has(code)),
     );
-  }, [useCases, sectorCodes, scopedIndustryCodes]);
+  }, [useCases, sectorCodes, industryCodeFilter, scopedIndustryCodes]);
 
   const scopedVariants = useMemo(() => {
-    if (!sectorCodes) return variants;
+    if (!sectorCodes && !industryCodeFilter) return variants;
     return variants.filter((v) => v.industryCode && scopedIndustryCodes.has(v.industryCode));
-  }, [variants, sectorCodes, scopedIndustryCodes]);
+  }, [variants, sectorCodes, industryCodeFilter, scopedIndustryCodes]);
 
   const scopedMarketplace = useMemo(() => {
     const arr = marketplace ?? [];
-    if (!sectorCodes) return arr;
+    if (!sectorCodes && !industryCodeFilter) return arr;
     const scopedVariantIds = new Set(scopedVariants.map((v) => v.id));
     return arr.filter((m) => m.agentVariantId && scopedVariantIds.has(m.agentVariantId));
-  }, [marketplace, sectorCodes, scopedVariants]);
+  }, [marketplace, sectorCodes, industryCodeFilter, scopedVariants]);
 
   // 1. System Health: average intelligence score (global — not sector-scopeable)
   const systemHealth =
@@ -164,6 +177,7 @@ export function GlobalMetricsStrip() {
   const autonomyConfidence = dashboard ? Math.round((dashboard.systemConfidence ?? 0) * 100) : 0;
 
   const metrics: MetricDef[] = [
+    { id: 'useCaseCount', label: 'Use Cases', value: scopedUseCases.length, color: '#f59e0b' },
     { id: 'systemHealth', label: 'System Health', value: systemHealth, color: '#3b82f6' },
     { id: 'riskConcentration', label: 'Risk Conc.', value: riskConcentration, color: '#ef4444' },
     {
@@ -206,9 +220,17 @@ export function GlobalMetricsStrip() {
     dispatch(setActiveMetricPanel(metricId));
   };
 
-  const focusedLabel = focusedSectorId
-    ? MACRO_SECTORS.find((m) => m.id === focusedSectorId)?.label
-    : null;
+  // Build the "Showing:" label
+  const showingLabel = useMemo(() => {
+    if (industryCodeFilter) {
+      const ind = industries.find((i) => i.code === industryCodeFilter);
+      return ind?.title ?? industryCodeFilter;
+    }
+    if (focusedSectorId) {
+      return MACRO_SECTORS.find((m) => m.id === focusedSectorId)?.label ?? null;
+    }
+    return null;
+  }, [industryCodeFilter, focusedSectorId, industries]);
 
   return (
     <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30">
@@ -217,9 +239,9 @@ export function GlobalMetricsStrip() {
           <AnimatedMetric key={m.id} {...m} onClick={handleMetricClick} />
         ))}
       </div>
-      {focusedLabel && (
+      {showingLabel && (
         <div className="text-[8px] text-[var(--text-muted)]/60 text-center mt-0.5">
-          Showing: {focusedLabel}
+          Showing: {showingLabel}
         </div>
       )}
     </div>

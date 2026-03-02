@@ -30,6 +30,7 @@ interface GraphSliceState extends GraphUIState {
   focusedSectorId: MacroSectorId | null;
   hiddenSectorIds: MacroSectorId[];
   activeMetricPanel: string | null;
+  demoMode: boolean;
 }
 
 const initialState: GraphSliceState = {
@@ -41,6 +42,7 @@ const initialState: GraphSliceState = {
   focusedSectorId: null,
   hiddenSectorIds: [],
   activeMetricPanel: null,
+  demoMode: false,
 };
 
 export const fetchOntologyRelationships = createAsyncThunk(
@@ -206,15 +208,23 @@ const graphSlice = createSlice({
     setAltitude(state, action: PayloadAction<{ level: AltitudeLevel; context: AltitudeContext }>) {
       state.currentAltitude = action.payload.level;
       state.altitudeContext = action.payload.context;
-      // Clear selection and focus on altitude change
+      // Clear selection on altitude change
       state.selectedNodeIds = [];
       state.contextPanelOpen = false;
       state.contextPanelNodeId = null;
       state.contextPanelNodeType = null;
-      state.focusedSectorId = null;
+      // Preserve focusedSectorId if jumping to GLOBAL with a sectorId context
+      if (action.payload.level === 'GLOBAL' && action.payload.context.sectorId) {
+        state.focusedSectorId = action.payload.context.sectorId as MacroSectorId;
+      } else if (action.payload.level === 'GLOBAL') {
+        state.focusedSectorId = null;
+      }
     },
 
-    descendAltitude(state, action: PayloadAction<{ targetId: string; targetType: string }>) {
+    descendAltitude(
+      state,
+      action: PayloadAction<{ targetId: string; targetType: string; sectorId?: string }>,
+    ) {
       const result = AltitudeController.descend(
         state.currentAltitude,
         state.altitudeContext,
@@ -224,6 +234,10 @@ const graphSlice = createSlice({
       if (result) {
         state.currentAltitude = result.level;
         state.altitudeContext = result.context;
+        // Capture sectorId when descending from GLOBAL
+        if (action.payload.sectorId) {
+          state.altitudeContext.sectorId = action.payload.sectorId;
+        }
         state.altitudeAnimating = true;
         // Clear selection and focus on descent
         state.selectedNodeIds = [];
@@ -237,19 +251,25 @@ const graphSlice = createSlice({
     },
 
     ascendAltitude(state) {
+      // Capture sectorId before ascend modifies context
+      const sectorId = state.altitudeContext.sectorId;
+      const wasIndustry = state.currentAltitude === 'INDUSTRY';
+
       const result = AltitudeController.ascend(state.currentAltitude, state.altitudeContext);
       if (result) {
         state.currentAltitude = result.level;
         state.altitudeContext = result.context;
         state.altitudeAnimating = true;
-        // Clear selection and focus on ascent
+        // Clear selection on ascent
         state.selectedNodeIds = [];
         state.contextPanelOpen = false;
         state.contextPanelNodeId = null;
         state.contextPanelNodeType = null;
         state.expandedNodeIds = [];
         state.isolatedSubgraphRoot = null;
-        state.focusedSectorId = null;
+        // When ascending from INDUSTRY → GLOBAL, preserve sector focus
+        // (useAltitudeController also dispatches setFocusedSector separately)
+        state.focusedSectorId = wasIndustry && sectorId ? (sectorId as MacroSectorId) : null;
       }
     },
 
@@ -292,6 +312,11 @@ const graphSlice = createSlice({
     // -- Metric detail panel --
     setActiveMetricPanel(state, action: PayloadAction<string | null>) {
       state.activeMetricPanel = action.payload;
+    },
+
+    // -- Demo mode --
+    setDemoMode(state, action: PayloadAction<boolean>) {
+      state.demoMode = action.payload;
     },
 
     // -- Simulation --
@@ -358,6 +383,7 @@ export const {
   toggleSectorVisibility,
   showAllSectors,
   setActiveMetricPanel,
+  setDemoMode,
   enterSimulation,
   exitSimulation,
   addSimulationModification,

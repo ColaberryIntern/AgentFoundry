@@ -215,7 +215,7 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           className="absolute z-50 pointer-events-none"
           style={{ top: bubbleSize + 4, left: '50%', transform: 'translateX(-50%)' }}
         >
-          <div className="bg-[var(--surface-primary)]/95 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+          <div className="bg-[#0f172a] backdrop-blur-md border border-white/20 rounded-lg px-3 py-2 shadow-2xl shadow-black/50 min-w-[160px] text-white">
             <div className="text-[10px] text-[var(--text-primary)] font-semibold mb-1 truncate">
               {title}
             </div>

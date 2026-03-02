@@ -104,7 +104,13 @@ export class AltitudeController {
       case 'INDUSTRY':
         return {
           level: 'GLOBAL',
-          context: { industryCode: null, useCaseId: null, skeletonId: null, variantId: null },
+          context: {
+            sectorId: currentContext.sectorId,
+            industryCode: null,
+            useCaseId: null,
+            skeletonId: null,
+            variantId: null,
+          },
         };
 
       case 'GLOBAL':
@@ -124,6 +130,7 @@ export class AltitudeController {
     return {
       level: targetLevel,
       context: {
+        sectorId: depth >= 1 ? currentContext.sectorId : null,
         industryCode: depth >= 1 ? currentContext.industryCode : null,
         useCaseId: depth >= 2 ? currentContext.useCaseId : null,
         skeletonId: depth >= 3 ? currentContext.skeletonId : null,
@@ -156,6 +163,7 @@ export class AltitudeController {
     altitude: AltitudeLevel,
     context: AltitudeContext,
     entityLabels: Record<string, string>,
+    focusedSectorLabel?: string | null,
   ): BreadcrumbItem[] {
     const crumbs: BreadcrumbItem[] = [];
     const depth = ALTITUDE_DEPTH[altitude];
@@ -164,14 +172,39 @@ export class AltitudeController {
     crumbs.push({
       level: 'GLOBAL',
       label: 'Global',
-      context: { industryCode: null, useCaseId: null, skeletonId: null, variantId: null },
+      context: {
+        sectorId: null,
+        industryCode: null,
+        useCaseId: null,
+        skeletonId: null,
+        variantId: null,
+      },
     });
+
+    // Sector crumb: shown when sectorId is in context (at INDUSTRY+ altitude)
+    // or when at GLOBAL with a focused sector
+    if (context.sectorId && focusedSectorLabel) {
+      crumbs.push({
+        level: 'GLOBAL',
+        label: focusedSectorLabel,
+        context: {
+          sectorId: context.sectorId,
+          industryCode: null,
+          useCaseId: null,
+          skeletonId: null,
+          variantId: null,
+        },
+        isSectorCrumb: true,
+        sectorId: context.sectorId,
+      });
+    }
 
     if (depth >= 1 && context.industryCode) {
       crumbs.push({
         level: 'INDUSTRY',
         label: entityLabels[context.industryCode] || context.industryCode,
         context: {
+          sectorId: context.sectorId,
           industryCode: context.industryCode,
           useCaseId: null,
           skeletonId: null,
@@ -185,6 +218,7 @@ export class AltitudeController {
         level: 'USE_CASE',
         label: entityLabels[context.useCaseId] || 'Use Case',
         context: {
+          sectorId: context.sectorId,
           industryCode: context.industryCode,
           useCaseId: context.useCaseId,
           skeletonId: null,
@@ -198,6 +232,7 @@ export class AltitudeController {
         level: 'STACK',
         label: entityLabels[context.skeletonId] || 'Stack',
         context: {
+          sectorId: context.sectorId,
           industryCode: context.industryCode,
           useCaseId: context.useCaseId,
           skeletonId: context.skeletonId,
@@ -211,6 +246,7 @@ export class AltitudeController {
         level: 'AGENT',
         label: entityLabels[context.variantId] || 'Agent',
         context: {
+          sectorId: context.sectorId,
           industryCode: context.industryCode,
           useCaseId: context.useCaseId,
           skeletonId: context.skeletonId,
