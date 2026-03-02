@@ -1,11 +1,18 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { scoreToColor } from '../utils/performanceUtils';
 
 /**
- * Rounded rectangle cluster for USE_CASE altitude.
- * Shows skeleton name, variant count, risk indicator, cert health bar.
+ * Circular bubble node for USE_CASE altitude (stack/skeleton clusters).
+ *
+ * 7 simultaneous KPI channels (matching IndustryClusterNode):
+ *   1. Radius     → variantCount (power curve)
+ *   2. Fill tint  → riskIndex (20-35% opacity gradient)
+ *   3. Outer ring → certHealthPercent (1-4px arc)
+ *   4. Inner arc  → coveragePercent (green arc over gray track)
+ *   5. Glow       → revenueScore (outer blur if ≥ 60)
+ *   6. Dot        → volatilityScore (gray/amber/red static marker)
+ *   7. Text       → skeleton name + variant count
  */
 function StackClusterNodeInner({ data }: NodeProps) {
   const d = data as Record<string, unknown>;
@@ -17,82 +24,243 @@ function StackClusterNodeInner({ data }: NodeProps) {
     | {
         certHealthPercent: number;
         riskIndex: number;
+        coveragePercent: number;
+        volatilityScore: number;
         activeDeployments: number;
       }
     | undefined;
 
+  const bubbleSize = (d.bubbleSize as number) ?? 110;
+  const riskColor = (d.riskColor as string) ?? '#8b5cf6';
+  const certRingColor = (d.certRingColor as string) ?? riskColor;
   const certHealth = metrics?.certHealthPercent ?? 0;
+  const riskIndex = metrics?.riskIndex ?? 0;
   const activeDeployments = metrics?.activeDeployments ?? 0;
+  const volatilityScore = (d.volatilityScore as number) ?? metrics?.volatilityScore ?? 0;
+  const coveragePercent = (d.coveragePercent as number) ?? metrics?.coveragePercent ?? 0;
+  const revenueScore = (d.revenueScore as number) ?? 0;
 
+  const [hovered, setHovered] = useState(false);
+
+  // -- KPI 2: Risk fill tint opacity (20-35%)
+  const riskFillOpacity = 0.2 + (riskIndex / 100) * 0.15;
+
+  // -- KPI 3: Cert health ring
+  const certStrokeWidth = 1 + (certHealth / 100) * 3;
+  const radius = bubbleSize / 2 - 6;
+  const circumference = 2 * Math.PI * radius;
+  const certArc = (certHealth / 100) * circumference;
+
+  // -- KPI 4: Coverage gap arc
+  const coverageRadius = radius - certStrokeWidth - 3;
+  const coverageCircum = 2 * Math.PI * coverageRadius;
+  const coverageArc = (coveragePercent / 100) * coverageCircum;
+
+  // -- KPI 5: Revenue glow
+  const hasRevenueGlow = revenueScore >= 60;
+  const revenueGlowSize = hasRevenueGlow ? 12 + (revenueScore - 60) * 0.3 : 0;
+
+  // -- KPI 6: Volatility dot (always shown)
+  const volatilityDotColor =
+    volatilityScore > 70 ? '#ef4444' : volatilityScore > 40 ? '#f59e0b' : '#6b7280';
+  const volatilityDotR = 3 + (volatilityScore / 100) * 3;
+
+  // Risk badge color classes
   const riskColors: Record<string, string> = {
-    low: 'text-emerald-400 bg-emerald-500/10',
-    medium: 'text-amber-400 bg-amber-500/10',
-    high: 'text-red-400 bg-red-500/10',
-    critical: 'text-red-500 bg-red-500/15',
+    low: '#10b981',
+    medium: '#f59e0b',
+    high: '#ef4444',
+    critical: '#dc2626',
   };
-  const riskClass = riskColors[riskLevel] ?? riskColors.low;
+
+  const baseOpacity = 0.8 + (bubbleSize / 220) * 0.2;
 
   return (
     <div
-      className="relative rounded-xl min-w-[180px] max-w-[220px] backdrop-blur-md border border-purple-500/20 bg-purple-500/[0.06] shadow-sm cursor-pointer group hover:border-purple-500/40 transition-all duration-200"
-      style={{ opacity: (d.opacity as number) ?? 1 }}
+      className="relative flex items-center justify-center cursor-pointer group"
+      style={{
+        width: bubbleSize,
+        height: bubbleSize,
+        opacity: ((d.opacity as number) ?? 1) * baseOpacity,
+        transform: hovered ? 'scale(1.05)' : 'scale(1)',
+        filter: hovered ? `drop-shadow(0 4px 16px ${riskColor}40)` : 'none',
+        boxShadow: hasRevenueGlow ? `0 0 ${revenueGlowSize}px ${riskColor}30` : 'none',
+        borderRadius: '50%',
+        transition:
+          'opacity 200ms ease, transform 200ms ease, filter 200ms ease, box-shadow 300ms ease',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {/* Type badge */}
-      <div className="absolute -top-2 -left-1 px-1.5 py-0.5 text-[9px] font-bold rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">
-        STK
-      </div>
+      <svg
+        width={bubbleSize}
+        height={bubbleSize}
+        viewBox={`0 0 ${bubbleSize} ${bubbleSize}`}
+        className="absolute inset-0"
+      >
+        {/* KPI 2: Background circle — risk tint */}
+        <circle
+          cx={bubbleSize / 2}
+          cy={bubbleSize / 2}
+          r={radius + 2}
+          fill={riskColor}
+          opacity={riskFillOpacity}
+        />
+        {/* Inner glow */}
+        <circle
+          cx={bubbleSize / 2}
+          cy={bubbleSize / 2}
+          r={radius - 10}
+          fill={riskColor}
+          opacity={0.08}
+        />
 
-      <div className="p-3 pt-4">
-        {/* Name */}
-        <div className="text-[11px] font-medium text-[var(--text-primary)] leading-tight">
+        {/* KPI 3: Cert health ring — background track */}
+        <circle
+          cx={bubbleSize / 2}
+          cy={bubbleSize / 2}
+          r={radius}
+          fill="none"
+          stroke={riskColor}
+          strokeWidth={1}
+          opacity={0.15}
+        />
+        {/* KPI 3: Cert health ring — active arc */}
+        <circle
+          cx={bubbleSize / 2}
+          cy={bubbleSize / 2}
+          r={radius}
+          fill="none"
+          stroke={certRingColor}
+          strokeWidth={certStrokeWidth}
+          strokeDasharray={`${certArc} ${circumference}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${bubbleSize / 2} ${bubbleSize / 2})`}
+          opacity={0.8}
+        />
+
+        {/* KPI 4: Coverage gap arc — gray track */}
+        <circle
+          cx={bubbleSize / 2}
+          cy={bubbleSize / 2}
+          r={coverageRadius}
+          fill="none"
+          stroke="#374151"
+          strokeWidth={1.5}
+          opacity={0.2}
+        />
+        {/* KPI 4: Coverage gap arc — green fill */}
+        <circle
+          cx={bubbleSize / 2}
+          cy={bubbleSize / 2}
+          r={coverageRadius}
+          fill="none"
+          stroke="#10b981"
+          strokeWidth={1.5}
+          strokeDasharray={`${coverageArc} ${coverageCircum}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${bubbleSize / 2} ${bubbleSize / 2})`}
+          opacity={0.7}
+        />
+
+        {/* KPI 6: Volatility marker — always shown */}
+        <circle
+          cx={bubbleSize / 2 + radius * 0.6}
+          cy={bubbleSize / 2 + radius * 0.6}
+          r={volatilityDotR}
+          fill={volatilityDotColor}
+          opacity={0.85}
+        />
+      </svg>
+
+      {/* KPI 7: Content text */}
+      <div className="relative z-10 text-center px-2">
+        <div className="text-[10px] font-bold text-[var(--text-primary)] leading-tight line-clamp-2">
           {label}
         </div>
-
-        {/* Specialization */}
+        <div className="text-[8px] text-[var(--text-muted)] mt-0.5">
+          {variantCount} var · {activeDeployments} active
+        </div>
         {sublabel && (
-          <div className="text-[9px] text-[var(--text-muted)] mt-0.5 capitalize">{sublabel}</div>
+          <div className="text-[7px] text-[var(--text-muted)]/60 mt-0.5 capitalize">{sublabel}</div>
         )}
-
-        {/* Stats row */}
-        <div className="flex items-center gap-2 mt-2">
-          <span className="text-[9px] text-cyan-400 font-medium">{variantCount} variants</span>
-          <span className="text-[9px] text-indigo-400 font-medium">{activeDeployments} active</span>
-          <span
-            className={`text-[8px] font-bold px-1 py-0.5 rounded ml-auto capitalize ${riskClass}`}
-          >
-            {riskLevel}
-          </span>
-        </div>
-
-        {/* Cert health bar */}
-        <div className="mt-1.5">
-          <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${certHealth}%`,
-                backgroundColor: scoreToColor(certHealth),
-              }}
-            />
-          </div>
-          <div className="text-[8px] text-[var(--text-muted)] mt-0.5">
-            cert health {certHealth}%
-          </div>
-        </div>
       </div>
+
+      {/* Hover tooltip */}
+      {hovered && (
+        <div
+          className="absolute z-50 pointer-events-none"
+          style={{ top: bubbleSize + 4, left: '50%', transform: 'translateX(-50%)' }}
+        >
+          <div className="bg-[#0f172a] backdrop-blur-md border border-white/20 rounded-lg px-3 py-2 shadow-2xl shadow-black/50 min-w-[160px] text-white">
+            <div className="text-[10px] text-[var(--text-primary)] font-semibold mb-1 truncate">
+              {label}
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px]">
+              <span className="text-[var(--text-muted)]">Variants</span>
+              <span className="text-[var(--text-primary)] text-right">{variantCount}</span>
+              <span className="text-[var(--text-muted)]">Active</span>
+              <span className="text-[var(--text-primary)] text-right">{activeDeployments}</span>
+              <span className="text-[var(--text-muted)]">Risk Level</span>
+              <span
+                className="text-right capitalize"
+                style={{ color: riskColors[riskLevel] ?? '#10b981' }}
+              >
+                {riskLevel}
+              </span>
+              <span className="text-[var(--text-muted)]">Risk Index</span>
+              <span className="text-right" style={{ color: riskColor }}>
+                {riskIndex}
+              </span>
+              <span className="text-[var(--text-muted)]">Coverage</span>
+              <span className="text-[var(--text-primary)] text-right">{coveragePercent}%</span>
+              <span className="text-[var(--text-muted)]">Cert %</span>
+              <span className="text-right" style={{ color: certRingColor }}>
+                {certHealth}%
+              </span>
+              <span className="text-[var(--text-muted)]">Volatility</span>
+              <span className="text-[var(--text-primary)] text-right">{volatilityScore}</span>
+              <span className="text-[var(--text-muted)]">Revenue</span>
+              <span className="text-[var(--text-primary)] text-right">{revenueScore}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hover glow ring */}
+      <div
+        className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{
+          boxShadow: `0 0 20px ${riskColor}30, 0 0 40px ${riskColor}10`,
+          borderRadius: '50%',
+        }}
+      />
 
       <Handle
         type="target"
         position={Position.Top}
-        className="!w-2 !h-2 !bg-purple-500/60 !border-purple-400/30"
+        className="!w-2 !h-2 !bg-purple-500/60 !border-purple-400/30 !opacity-0"
       />
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!w-2 !h-2 !bg-purple-500/60 !border-purple-400/30"
+        className="!w-2 !h-2 !bg-purple-500/60 !border-purple-400/30 !opacity-0"
       />
     </div>
   );
 }
 
-export const StackClusterNode = memo(StackClusterNodeInner);
+export const StackClusterNode = memo(StackClusterNodeInner, (prev, next) => {
+  const p = prev.data as Record<string, unknown>;
+  const n = next.data as Record<string, unknown>;
+  return (
+    p.bubbleSize === n.bubbleSize &&
+    p.riskColor === n.riskColor &&
+    p.certRingColor === n.certRingColor &&
+    p.volatilityScore === n.volatilityScore &&
+    p.coveragePercent === n.coveragePercent &&
+    p.revenueScore === n.revenueScore &&
+    p.label === n.label &&
+    p.variantCount === n.variantCount
+  );
+});

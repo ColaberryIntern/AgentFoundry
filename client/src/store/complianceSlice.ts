@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { complianceApi } from '../services/complianceApi';
 import type { CalendarListParams } from '../types/compliance';
 import type {
@@ -29,6 +29,7 @@ interface ComplianceState {
   calendarTotal: number;
   calendarPage: number;
   calendarLimit: number;
+  _riskBackup: RiskAnalysisResult[] | null;
 }
 
 const initialState: ComplianceState = {
@@ -45,6 +46,7 @@ const initialState: ComplianceState = {
   calendarTotal: 0,
   calendarPage: 1,
   calendarLimit: 20,
+  _riskBackup: null,
 };
 
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -149,6 +151,14 @@ const complianceSlice = createSlice({
     setRiskAnalysis(state, action) {
       state.riskAnalysis = action.payload;
     },
+    loadDemoRiskAnalysis(state, action: PayloadAction<RiskAnalysisResult[]>) {
+      state._riskBackup = state.riskAnalysis;
+      state.riskAnalysis = action.payload;
+    },
+    restoreLiveRiskAnalysis(state) {
+      state.riskAnalysis = state._riskBackup ?? [];
+      state._riskBackup = null;
+    },
   },
   extraReducers: (builder) => {
     // fetchCalendarEvents
@@ -245,5 +255,10 @@ const complianceSlice = createSlice({
   },
 });
 
-export const { clearComplianceError, setRiskAnalysis } = complianceSlice.actions;
+export const {
+  clearComplianceError,
+  setRiskAnalysis,
+  loadDemoRiskAnalysis,
+  restoreLiveRiskAnalysis,
+} = complianceSlice.actions;
 export default complianceSlice.reducer;

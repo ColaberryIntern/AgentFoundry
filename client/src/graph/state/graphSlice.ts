@@ -31,6 +31,7 @@ interface GraphSliceState extends GraphUIState {
   hiddenSectorIds: MacroSectorId[];
   activeMetricPanel: string | null;
   demoMode: boolean;
+  _ontologyBackup: OntologyRelationship[] | null;
 }
 
 const initialState: GraphSliceState = {
@@ -43,6 +44,7 @@ const initialState: GraphSliceState = {
   hiddenSectorIds: [],
   activeMetricPanel: null,
   demoMode: false,
+  _ontologyBackup: null,
 };
 
 export const fetchOntologyRelationships = createAsyncThunk(
@@ -319,6 +321,17 @@ const graphSlice = createSlice({
       state.demoMode = action.payload;
     },
 
+    loadDemoOntology(state, action: PayloadAction<OntologyRelationship[]>) {
+      state._ontologyBackup = state.ontology.relationships;
+      state.ontology.relationships = action.payload;
+      state.ontologyLoaded = true;
+    },
+
+    restoreLiveOntology(state) {
+      state.ontology.relationships = state._ontologyBackup ?? [];
+      state._ontologyBackup = null;
+    },
+
     // -- Simulation --
     enterSimulation(state) {
       state.simulationMode = true;
@@ -384,6 +397,8 @@ export const {
   showAllSectors,
   setActiveMetricPanel,
   setDemoMode,
+  loadDemoOntology,
+  restoreLiveOntology,
   enterSimulation,
   exitSimulation,
   addSimulationModification,

@@ -19,7 +19,7 @@ import {
   riskToNode,
   marketplaceToNode,
 } from '../engine/nodeTransformers';
-import { riskToGradientColor, certToGradientColor } from '../utils/performanceUtils';
+import { clamp, riskToGradientColor, certToGradientColor } from '../utils/performanceUtils';
 import { getMacroSector } from './macroSectors';
 import { computeBubbleSize } from './weightingModes';
 
@@ -175,30 +175,47 @@ export function useAltitudeData(): AltitudeDataResult {
         })),
       );
 
-      const ucClusterNodes: Node[] = ucClusters.map((uc) => ({
-        id: `uccluster-${uc.useCaseId}`,
-        type: 'useCaseClusterNode',
-        position: { x: 0, y: 0 },
-        data: {
-          nodeType: 'useCaseCluster',
-          label:
-            uc.outcomeStatement.length > 50
-              ? uc.outcomeStatement.slice(0, 47) + '...'
-              : uc.outcomeStatement,
-          sublabel: uc.monetizationType?.replace(/_/g, ' ') ?? '',
-          useCaseId: uc.useCaseId,
-          outcomeStatement: uc.outcomeStatement,
-          monetizationType: uc.monetizationType,
-          urgencyScore: uc.urgencyScore,
-          stackCount: uc.stackCount,
-          agentCount: uc.agentCount,
-          deploymentCount: uc.deploymentCount,
-          metrics: uc.metrics,
-          emphasis: 'primary',
-          selected: false,
-          opacity: 1,
-        },
-      }));
+      // Pre-compute max agent count for revenue score normalization
+      const maxUcAgents = Math.max(...ucClusters.map((uc) => uc.agentCount), 1);
+
+      const ucClusterNodes: Node[] = ucClusters.map((uc) => {
+        const ucBubbleSize = clamp(
+          80 + Math.pow(uc.stackCount, 0.7) * 12 + Math.pow(uc.agentCount, 0.7) * 6,
+          60,
+          180,
+        );
+        return {
+          id: `uccluster-${uc.useCaseId}`,
+          type: 'useCaseClusterNode',
+          position: { x: 0, y: 0 },
+          data: {
+            nodeType: 'useCaseCluster',
+            label:
+              uc.outcomeStatement.length > 50
+                ? uc.outcomeStatement.slice(0, 47) + '...'
+                : uc.outcomeStatement,
+            sublabel: uc.monetizationType?.replace(/_/g, ' ') ?? '',
+            useCaseId: uc.useCaseId,
+            outcomeStatement: uc.outcomeStatement,
+            monetizationType: uc.monetizationType,
+            urgencyScore: uc.urgencyScore,
+            stackCount: uc.stackCount,
+            agentCount: uc.agentCount,
+            deploymentCount: uc.deploymentCount,
+            metrics: uc.metrics,
+            emphasis: 'primary',
+            selected: false,
+            opacity: 1,
+            // Bubble KPI encoding
+            bubbleSize: ucBubbleSize,
+            riskColor: riskToGradientColor(uc.metrics.riskIndex),
+            certRingColor: certToGradientColor(uc.metrics.certHealthPercent),
+            volatilityScore: uc.metrics.volatilityScore ?? 0,
+            coveragePercent: uc.metrics.coveragePercent ?? 0,
+            revenueScore: Math.round(Math.min(100, (uc.agentCount / maxUcAgents) * 100)),
+          },
+        };
+      });
 
       const edges = buildAltitudeEdges('INDUSTRY', {
         industryCode: code,
@@ -241,25 +258,38 @@ export function useAltitudeData(): AltitudeDataResult {
       // Build stack clusters
       const stClusters = aggregateStackClusters(effectiveSkeletons, relevantVariants);
 
-      const stClusterNodes: Node[] = stClusters.map((sk) => ({
-        id: `skcluster-${sk.skeletonId}`,
-        type: 'stackClusterNode',
-        position: { x: 0, y: 0 },
-        data: {
-          nodeType: 'stackCluster',
-          label: sk.name,
-          sublabel: sk.specializationType?.replace(/_/g, ' ') ?? '',
-          skeletonId: sk.skeletonId,
-          name: sk.name,
-          specializationType: sk.specializationType,
-          riskLevel: sk.riskLevel,
-          variantCount: sk.variantCount,
-          metrics: sk.metrics,
-          emphasis: 'primary',
-          selected: false,
-          opacity: 1,
-        },
-      }));
+      // Pre-compute max variant count for revenue normalization
+      const maxSkVariants = Math.max(...stClusters.map((sk) => sk.variantCount), 1);
+
+      const stClusterNodes: Node[] = stClusters.map((sk) => {
+        const skBubbleSize = clamp(70 + Math.pow(sk.variantCount, 0.7) * 14, 60, 160);
+        return {
+          id: `skcluster-${sk.skeletonId}`,
+          type: 'stackClusterNode',
+          position: { x: 0, y: 0 },
+          data: {
+            nodeType: 'stackCluster',
+            label: sk.name,
+            sublabel: sk.specializationType?.replace(/_/g, ' ') ?? '',
+            skeletonId: sk.skeletonId,
+            name: sk.name,
+            specializationType: sk.specializationType,
+            riskLevel: sk.riskLevel,
+            variantCount: sk.variantCount,
+            metrics: sk.metrics,
+            emphasis: 'primary',
+            selected: false,
+            opacity: 1,
+            // Bubble KPI encoding
+            bubbleSize: skBubbleSize,
+            riskColor: riskToGradientColor(sk.metrics.riskIndex),
+            certRingColor: certToGradientColor(sk.metrics.certHealthPercent),
+            volatilityScore: sk.metrics.volatilityScore ?? 0,
+            coveragePercent: sk.metrics.coveragePercent ?? 0,
+            revenueScore: Math.round(Math.min(100, (sk.variantCount / maxSkVariants) * 100)),
+          },
+        };
+      });
 
       const edges = buildAltitudeEdges('USE_CASE', {
         useCaseId: ucId,

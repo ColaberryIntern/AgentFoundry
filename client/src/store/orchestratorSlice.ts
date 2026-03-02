@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { orchestratorApi } from '../services/orchestratorApi';
 import type {
   OrchestratorDashboard,
@@ -36,6 +36,8 @@ interface OrchestratorState {
   marketplaceTotal: number;
   marketplaceLoading: boolean;
   error: string | null;
+  _marketplaceBackup: MarketplaceSubmission[] | null;
+  _dashboardBackup: OrchestratorDashboard | null;
 }
 
 const initialState: OrchestratorState = {
@@ -59,6 +61,8 @@ const initialState: OrchestratorState = {
   marketplaceTotal: 0,
   marketplaceLoading: false,
   error: null,
+  _marketplaceBackup: null,
+  _dashboardBackup: null,
 };
 
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -255,6 +259,22 @@ const orchestratorSlice = createSlice({
     clearError(state) {
       state.error = null;
     },
+    loadDemoMarketplace(state, action: PayloadAction<MarketplaceSubmission[]>) {
+      state._marketplaceBackup = state.marketplace;
+      state._dashboardBackup = state.dashboard;
+      state.marketplace = action.payload;
+      state.marketplaceTotal = action.payload.length;
+    },
+    loadDemoDashboard(state, action: PayloadAction<OrchestratorDashboard>) {
+      state.dashboard = action.payload;
+    },
+    restoreLiveOrchestrator(state) {
+      state.marketplace = state._marketplaceBackup ?? [];
+      state.marketplaceTotal = state._marketplaceBackup?.length ?? 0;
+      state.dashboard = state._dashboardBackup ?? null;
+      state._marketplaceBackup = null;
+      state._dashboardBackup = null;
+    },
   },
   extraReducers: (builder) => {
     // Dashboard
@@ -439,5 +459,6 @@ const orchestratorSlice = createSlice({
   },
 });
 
-export const { clearError } = orchestratorSlice.actions;
+export const { clearError, loadDemoMarketplace, loadDemoDashboard, restoreLiveOrchestrator } =
+  orchestratorSlice.actions;
 export default orchestratorSlice.reducer;

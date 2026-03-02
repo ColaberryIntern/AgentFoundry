@@ -103,7 +103,7 @@ export const ALTITUDE_CONFIGS: Record<AltitudeLevel, AltitudeConfig> = {
     visibleNodeTypes: ['industry', 'useCaseCluster'],
     layoutStrategy: 'radial',
     maxVisibleNodes: 150,
-    nodeDimensions: { width: 180, height: 120 },
+    nodeDimensions: { width: 180, height: 180 },
   },
   USE_CASE: {
     level: 'USE_CASE',
@@ -112,7 +112,7 @@ export const ALTITUDE_CONFIGS: Record<AltitudeLevel, AltitudeConfig> = {
     visibleNodeTypes: ['useCase', 'stackCluster'],
     layoutStrategy: 'dagre-TB',
     maxVisibleNodes: 200,
-    nodeDimensions: { width: 200, height: 100 },
+    nodeDimensions: { width: 160, height: 160 },
   },
   STACK: {
     level: 'STACK',

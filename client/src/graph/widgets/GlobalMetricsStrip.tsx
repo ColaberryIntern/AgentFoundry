@@ -76,11 +76,14 @@ function AnimatedMetric({
 
 export function GlobalMetricsStrip() {
   const dispatch = useAppDispatch();
-  const { industries, useCases, variants, intelligence } = useAppSelector((s) => s.registry);
+  const { industries, useCases, skeletons, variants, intelligence } = useAppSelector(
+    (s) => s.registry,
+  );
   const { marketplace, dashboard } = useAppSelector((s) => s.orchestrator);
   const { riskAnalysis } = useAppSelector((s) => s.compliance);
 
   const { currentAltitude, altitudeContext } = useAppSelector((s) => s.graph);
+  const ontologyRelationships = useAppSelector((s) => s.graph.ontology.relationships);
 
   const focusedSectorId =
     useAppSelector(
@@ -95,13 +98,42 @@ export function GlobalMetricsStrip() {
     return new Set(ms.sectorCodes);
   }, [focusedSectorId]);
 
-  // At INDUSTRY altitude, scope to the focused industry code
+  // Altitude-based filters
   const industryCodeFilter = useMemo((): string | null => {
     if (currentAltitude !== 'GLOBAL' && altitudeContext.industryCode) {
       return altitudeContext.industryCode;
     }
     return null;
   }, [currentAltitude, altitudeContext.industryCode]);
+
+  const useCaseIdFilter = useMemo((): string | null => {
+    if (
+      (currentAltitude === 'USE_CASE' ||
+        currentAltitude === 'STACK' ||
+        currentAltitude === 'AGENT') &&
+      altitudeContext.useCaseId
+    ) {
+      return altitudeContext.useCaseId;
+    }
+    return null;
+  }, [currentAltitude, altitudeContext.useCaseId]);
+
+  const skeletonIdFilter = useMemo((): string | null => {
+    if (
+      (currentAltitude === 'STACK' || currentAltitude === 'AGENT') &&
+      altitudeContext.skeletonId
+    ) {
+      return altitudeContext.skeletonId;
+    }
+    return null;
+  }, [currentAltitude, altitudeContext.skeletonId]);
+
+  const variantIdFilter = useMemo((): string | null => {
+    if (currentAltitude === 'AGENT' && altitudeContext.variantId) {
+      return altitudeContext.variantId;
+    }
+    return null;
+  }, [currentAltitude, altitudeContext.variantId]);
 
   // Scope data by focused sector or industry
   const scopedIndustries = useMemo(() => {
@@ -116,24 +148,76 @@ export function GlobalMetricsStrip() {
     return new Set(scopedIndustries.map((i) => i.code));
   }, [scopedIndustries]);
 
+  // Scope use cases: at USE_CASE level and below, filter to just the focused UC
   const scopedUseCases = useMemo(() => {
+    if (useCaseIdFilter) {
+      return useCases.filter((uc) => uc.id === useCaseIdFilter);
+    }
     if (!sectorCodes && !industryCodeFilter) return useCases;
     return useCases.filter((uc) =>
       uc.industryScope?.some((code: string) => scopedIndustryCodes.has(code)),
     );
-  }, [useCases, sectorCodes, industryCodeFilter, scopedIndustryCodes]);
+  }, [useCases, sectorCodes, industryCodeFilter, useCaseIdFilter, scopedIndustryCodes]);
 
+  // Scope variants: progressively narrower at deeper altitudes
   const scopedVariants = useMemo(() => {
+    // AGENT level: just the focused variant
+    if (variantIdFilter) {
+      return variants.filter((v) => v.id === variantIdFilter);
+    }
+    // STACK level: variants for the focused skeleton
+    if (skeletonIdFilter) {
+      return variants.filter((v) => v.skeletonId === skeletonIdFilter);
+    }
+    // USE_CASE level: variants linked via SOLVES ontology
+    if (useCaseIdFilter) {
+      const linkedSkeletonIds = ontologyRelationships
+        .filter(
+          (r) =>
+            r.relationshipType === 'SOLVES' &&
+            (r.subjectId === useCaseIdFilter || r.objectId === useCaseIdFilter),
+        )
+        .map((r) => (r.subjectId === useCaseIdFilter ? r.objectId : r.subjectId));
+      if (linkedSkeletonIds.length > 0) {
+        const skIdSet = new Set(linkedSkeletonIds);
+        return variants.filter((v) => skIdSet.has(v.skeletonId));
+      }
+      return variants.filter((v) => v.industryCode && scopedIndustryCodes.has(v.industryCode));
+    }
     if (!sectorCodes && !industryCodeFilter) return variants;
     return variants.filter((v) => v.industryCode && scopedIndustryCodes.has(v.industryCode));
-  }, [variants, sectorCodes, industryCodeFilter, scopedIndustryCodes]);
+  }, [
+    variants,
+    sectorCodes,
+    industryCodeFilter,
+    useCaseIdFilter,
+    skeletonIdFilter,
+    variantIdFilter,
+    scopedIndustryCodes,
+    ontologyRelationships,
+  ]);
 
   const scopedMarketplace = useMemo(() => {
     const arr = marketplace ?? [];
-    if (!sectorCodes && !industryCodeFilter) return arr;
+    if (
+      !sectorCodes &&
+      !industryCodeFilter &&
+      !useCaseIdFilter &&
+      !skeletonIdFilter &&
+      !variantIdFilter
+    )
+      return arr;
     const scopedVariantIds = new Set(scopedVariants.map((v) => v.id));
     return arr.filter((m) => m.agentVariantId && scopedVariantIds.has(m.agentVariantId));
-  }, [marketplace, sectorCodes, industryCodeFilter, scopedVariants]);
+  }, [
+    marketplace,
+    sectorCodes,
+    industryCodeFilter,
+    useCaseIdFilter,
+    skeletonIdFilter,
+    variantIdFilter,
+    scopedVariants,
+  ]);
 
   // 1. System Health: average intelligence score (global — not sector-scopeable)
   const systemHealth =
@@ -220,8 +304,25 @@ export function GlobalMetricsStrip() {
     dispatch(setActiveMetricPanel(metricId));
   };
 
-  // Build the "Showing:" label
+  // Build the "Showing:" label — progressively more specific at deeper altitudes
   const showingLabel = useMemo(() => {
+    if (variantIdFilter) {
+      const v = variants.find((vr) => vr.id === variantIdFilter);
+      return v?.name ?? variantIdFilter;
+    }
+    if (skeletonIdFilter) {
+      const sk = skeletons.find((s) => s.id === skeletonIdFilter);
+      return sk?.name ?? skeletonIdFilter;
+    }
+    if (useCaseIdFilter) {
+      const uc = useCases.find((u) => u.id === useCaseIdFilter);
+      if (uc) {
+        return uc.outcomeStatement.length > 40
+          ? uc.outcomeStatement.slice(0, 37) + '...'
+          : uc.outcomeStatement;
+      }
+      return useCaseIdFilter;
+    }
     if (industryCodeFilter) {
       const ind = industries.find((i) => i.code === industryCodeFilter);
       return ind?.title ?? industryCodeFilter;
@@ -230,7 +331,17 @@ export function GlobalMetricsStrip() {
       return MACRO_SECTORS.find((m) => m.id === focusedSectorId)?.label ?? null;
     }
     return null;
-  }, [industryCodeFilter, focusedSectorId, industries]);
+  }, [
+    variantIdFilter,
+    skeletonIdFilter,
+    useCaseIdFilter,
+    industryCodeFilter,
+    focusedSectorId,
+    industries,
+    useCases,
+    skeletons,
+    variants,
+  ]);
 
   return (
     <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30">

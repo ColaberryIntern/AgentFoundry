@@ -1,11 +1,17 @@
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { setDemoMode } from '../state/graphSlice';
+import { setDemoMode, loadDemoOntology, restoreLiveOntology } from '../state/graphSlice';
 import { loadDemoData, restoreRealData } from '../../store/registrySlice';
-import { generateHealthcareDemoData } from '../demo/healthcareDemoData';
+import {
+  loadDemoMarketplace,
+  loadDemoDashboard,
+  restoreLiveOrchestrator,
+} from '../../store/orchestratorSlice';
+import { loadDemoRiskAnalysis, restoreLiveRiskAnalysis } from '../../store/complianceSlice';
+import { generateAllSectorDemoData } from '../demo/allSectorDemoData';
 
 /**
  * Toggle pill: LIVE DATA (green) ↔ DEMO DATA (amber).
- * Switches the registry between real backend data and generated demo data.
+ * Switches all stores between real backend data and generated demo data.
  */
 export function DemoModeToggle() {
   const dispatch = useAppDispatch();
@@ -14,12 +20,20 @@ export function DemoModeToggle() {
 
   const handleToggle = () => {
     if (demoMode) {
-      // Switch to live
+      // Switch to live — restore all stores
       dispatch(restoreRealData());
+      dispatch(restoreLiveOrchestrator());
+      dispatch(restoreLiveRiskAnalysis());
+      dispatch(restoreLiveOntology());
       dispatch(setDemoMode(false));
     } else {
-      // Switch to demo
-      dispatch(loadDemoData(generateHealthcareDemoData()));
+      // Switch to demo — populate all stores
+      const demo = generateAllSectorDemoData();
+      dispatch(loadDemoData(demo));
+      dispatch(loadDemoMarketplace(demo.marketplace));
+      dispatch(loadDemoDashboard(demo.dashboard));
+      dispatch(loadDemoRiskAnalysis(demo.riskAnalysis));
+      dispatch(loadDemoOntology(demo.ontologyRelationships));
       dispatch(setDemoMode(true));
     }
   };

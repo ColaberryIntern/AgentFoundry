@@ -184,16 +184,14 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           opacity={0.7}
         />
 
-        {/* KPI 6: Volatility marker — static colored dot at bottom-right */}
-        {volatilityScore > 0 && (
-          <circle
-            cx={bubbleSize / 2 + radius * 0.6}
-            cy={bubbleSize / 2 + radius * 0.6}
-            r={volatilityDotR}
-            fill={volatilityDotColor}
-            opacity={0.85}
-          />
-        )}
+        {/* KPI 6: Volatility marker — static colored dot at bottom-right (always shown) */}
+        <circle
+          cx={bubbleSize / 2 + radius * 0.6}
+          cy={bubbleSize / 2 + radius * 0.6}
+          r={volatilityDotR}
+          fill={volatilityDotColor}
+          opacity={0.85}
+        />
       </svg>
 
       {/* KPI 7: Content text — title + code · UC count */}
