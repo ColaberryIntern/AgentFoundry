@@ -27,9 +27,9 @@ interface SectorHull {
 }
 
 /**
- * SVG overlay rendering convex hull boundaries + bold labels per macro-sector.
- * Hulls are computed from actual node positions, not arbitrary ellipses.
- * Labels are zoom-compensated for constant screen readability.
+ * Convex hull boundaries + bold sector labels per macro-sector.
+ * Hull shapes render in SVG at z-index 1 (behind nodes).
+ * Labels render as HTML at z-index 10 (above nodes) for guaranteed visibility.
  */
 export function SectorBoundaryOverlay({
   nodes,
@@ -65,7 +65,6 @@ export function SectorBoundaryOverlay({
       let labelY: number;
 
       if (points.length === 0) {
-        // No nodes: circle at anchor
         pathD = circleFallbackPath(anchor, 60);
         centerX = anchor.x;
         labelY = anchor.y - 60 - 16;
@@ -93,72 +92,75 @@ export function SectorBoundaryOverlay({
         isCenter,
       };
     }).filter((s) => {
-      // Only render sectors that have nodes
       const points = sectorPoints.get(s.id as MacroSectorId);
       return points && points.length > 0;
     });
   }, [nodes, anchorMap, centerSectorId, ringRadius]);
 
   return (
-    <svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      style={{
-        transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
-        transformOrigin: '0 0',
-        zIndex: 1,
-      }}
-    >
-      <defs>
-        {/* Drop shadow filter for labels */}
-        <filter id="sector-label-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.6" />
-        </filter>
+    <>
+      {/* Hull shapes — SVG behind nodes (z-index 1) */}
+      <svg
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        style={{
+          transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+          transformOrigin: '0 0',
+          zIndex: 1,
+        }}
+      >
+        <defs>
+          {sectorHulls.map((s) => (
+            <radialGradient key={`hull-bg-${s.id}`} id={`hull-bg-${s.id}`}>
+              <stop offset="0%" stopColor={s.color} stopOpacity={0.06} />
+              <stop offset="60%" stopColor={s.color} stopOpacity={0.04} />
+              <stop offset="100%" stopColor={s.color} stopOpacity={0.0} />
+            </radialGradient>
+          ))}
+        </defs>
 
-        {/* Per-sector radial gradients for hull fill */}
         {sectorHulls.map((s) => (
-          <radialGradient key={`hull-bg-${s.id}`} id={`hull-bg-${s.id}`}>
-            <stop offset="0%" stopColor={s.color} stopOpacity={0.06} />
-            <stop offset="60%" stopColor={s.color} stopOpacity={0.04} />
-            <stop offset="100%" stopColor={s.color} stopOpacity={0.0} />
-          </radialGradient>
-        ))}
-      </defs>
-
-      {sectorHulls.map((s) => (
-        <g key={s.id}>
-          {/* Hull gradient fill */}
-          <path d={s.pathD} fill={`url(#hull-bg-${s.id})`} />
-
-          {/* Hull boundary stroke */}
-          <path
-            d={s.pathD}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={1.5}
-            opacity={0.12}
-            strokeDasharray={s.isCenter ? 'none' : '6 4'}
-          />
-
-          {/* Sector label — zoom-compensated, bold, with drop shadow */}
-          <g transform={`translate(${s.centerX}, ${s.labelY})`}>
-            <g transform={`scale(${1 / viewport.zoom})`}>
-              <text
-                x={0}
-                y={0}
-                textAnchor="middle"
-                fill={s.color}
-                fontSize={16}
-                fontWeight={700}
-                opacity={0.75}
-                filter="url(#sector-label-shadow)"
-                style={{ fontFamily: 'inherit' }}
-              >
-                {s.label}
-              </text>
-            </g>
+          <g key={s.id}>
+            <path d={s.pathD} fill={`url(#hull-bg-${s.id})`} />
+            <path
+              d={s.pathD}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={1.5}
+              opacity={0.12}
+              strokeDasharray={s.isCenter ? 'none' : '6 4'}
+            />
           </g>
-        </g>
-      ))}
-    </svg>
+        ))}
+      </svg>
+
+      {/* Sector labels — HTML above nodes (z-index 10) */}
+      <div className="absolute inset-0 pointer-events-none overflow-visible" style={{ zIndex: 10 }}>
+        {sectorHulls.map((s) => {
+          // Convert graph coordinates to screen coordinates
+          const screenX = viewport.x + s.centerX * viewport.zoom;
+          const screenY = viewport.y + s.labelY * viewport.zoom;
+
+          return (
+            <div
+              key={`label-${s.id}`}
+              className="absolute whitespace-nowrap"
+              style={{
+                left: screenX,
+                top: screenY,
+                transform: 'translate(-50%, -100%)',
+                fontSize: 16,
+                fontWeight: 700,
+                color: s.color,
+                opacity: 0.85,
+                textShadow: '0 1px 3px rgba(0,0,0,0.7), 0 0 8px rgba(0,0,0,0.3)',
+                letterSpacing: '0.02em',
+              }}
+            >
+              {s.label}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }

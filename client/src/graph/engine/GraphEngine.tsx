@@ -20,12 +20,8 @@ import {
   hoverNode,
   deselectAll,
   hideContextMenu,
-  setWeightingMode,
-  toggleHeatmap,
   setHoveredMacroSector,
 } from '../state/graphSlice';
-import type { WeightingMode } from '../altitude/weightingModes';
-import { WEIGHTING_CONFIGS, WEIGHTING_TOOLTIPS } from '../altitude/weightingModes';
 import { getMacroSector } from '../altitude/macroSectors';
 import type { MacroSectorId } from '../altitude/macroSectors';
 
@@ -55,7 +51,6 @@ import { CommandConsole } from '../console/CommandConsole';
 import { SimulationBanner } from '../simulation/SimulationBanner';
 import { SystemHealthOrb } from '../widgets/SystemHealthOrb';
 import { GlobalMetricsStrip } from '../widgets/GlobalMetricsStrip';
-import { HeatmapOverlay } from '../overlays/HeatmapOverlay';
 import { SectorBoundaryOverlay } from '../overlays/SectorBoundaryOverlay';
 import { SectorBadgeOverlay } from '../overlays/SectorBadgeOverlay';
 import { SectorSelectorBar } from '../widgets/SectorSelectorBar';
@@ -103,53 +98,10 @@ const miniMapColorMap: Record<string, string> = {
   stackCluster: '#a855f7',
 };
 
-// Weighting mode toggle — only shown at GLOBAL altitude
-function WeightingModeToggle({
-  current,
-  onSelect,
-}: {
-  current: WeightingMode;
-  onSelect: (mode: WeightingMode) => void;
-}) {
-  const modes = Object.values(WEIGHTING_CONFIGS);
-  const currentConfig = WEIGHTING_CONFIGS[current];
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="text-[9px] text-[var(--text-muted)] font-medium px-1">
-        Global Weighting Mode
-      </div>
-      <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-primary)]/80 backdrop-blur-md border border-white/5">
-        {modes.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => onSelect(m.id)}
-            title={WEIGHTING_TOOLTIPS[m.id]}
-            className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
-              current === m.id
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'text-[var(--text-muted)] hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-      <div className="text-[8px] text-[var(--text-muted)]/70 px-1">{currentConfig.description}</div>
-    </div>
-  );
-}
-
 function GraphEngineInner() {
   const dispatch = useAppDispatch();
   const reactFlowInstance = useReactFlow();
   const altitudeCtrl = useAltitudeController();
-  const weightingMode =
-    useAppSelector(
-      (s) => (s.graph as unknown as { weightingMode?: WeightingMode }).weightingMode,
-    ) ?? 'coverage';
-  const heatmapEnabled =
-    useAppSelector((s) => (s.graph as unknown as { heatmapEnabled?: boolean }).heatmapEnabled) ??
-    false;
   const hiddenSectorIds =
     useAppSelector(
       (s) => (s.graph as unknown as { hiddenSectorIds?: MacroSectorId[] }).hiddenSectorIds,
@@ -195,9 +147,8 @@ function GraphEngineInner() {
 
   // Compute triggerKey — layout only recalculates when this changes
   const triggerKey = useMemo(
-    () =>
-      `${altitude}:${weightingMode}:${nodeCount}:${centerSectorId ?? ''}:${hiddenSectorIds.join(',')}`,
-    [altitude, weightingMode, nodeCount, centerSectorId, hiddenSectorIds],
+    () => `${altitude}:${nodeCount}:${centerSectorId ?? ''}:${hiddenSectorIds.join(',')}`,
+    [altitude, nodeCount, centerSectorId, hiddenSectorIds],
   );
 
   // Altitude-aware layout with physics freeze
@@ -394,9 +345,6 @@ function GraphEngineInner() {
         />
       </ReactFlow>
 
-      {/* Heatmap overlay (behind nodes, GLOBAL only) */}
-      {altitude === 'GLOBAL' && heatmapEnabled && <HeatmapOverlay />}
-
       {/* Sector boundary + badge overlays (GLOBAL only) */}
       {altitude === 'GLOBAL' && (
         <>
@@ -421,26 +369,6 @@ function GraphEngineInner() {
 
       {/* Mode Toolbar overlay */}
       <ModeToolbar />
-
-      {/* Weighting Mode + Heatmap Toggle (GLOBAL only) */}
-      {altitude === 'GLOBAL' && (
-        <div className="absolute top-20 left-4 z-30 flex flex-col gap-2">
-          <WeightingModeToggle
-            current={weightingMode}
-            onSelect={(mode) => dispatch(setWeightingMode(mode))}
-          />
-          <button
-            onClick={() => dispatch(toggleHeatmap())}
-            className={`self-start px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors border ${
-              heatmapEnabled
-                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                : 'text-[var(--text-muted)] hover:bg-white/5 border-white/5'
-            } bg-[var(--surface-primary)]/80 backdrop-blur-md`}
-          >
-            Heatmap {heatmapEnabled ? 'ON' : 'OFF'}
-          </button>
-        </div>
-      )}
 
       {/* Sector Selector (GLOBAL only) */}
       {altitude === 'GLOBAL' && <SectorSelectorBar visibleSectorIds={visibleSectorIds} />}

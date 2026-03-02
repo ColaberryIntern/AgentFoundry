@@ -22,7 +22,6 @@ import {
 import { riskToGradientColor, certToGradientColor } from '../utils/performanceUtils';
 import { getMacroSector } from './macroSectors';
 import { computeBubbleSize } from './weightingModes';
-import type { WeightingMode } from './weightingModes';
 
 // ---------------------------------------------------------------------------
 // Hook Return Type
@@ -46,10 +45,6 @@ export function useAltitudeData(): AltitudeDataResult {
   const hiddenSectorIds =
     useAppSelector((s) => (s.graph as unknown as { hiddenSectorIds?: string[] }).hiddenSectorIds) ??
     [];
-  const weightingMode =
-    useAppSelector(
-      (s) => (s.graph as unknown as { weightingMode?: WeightingMode }).weightingMode,
-    ) ?? 'coverage';
   const { industries, useCases, skeletons, variants, intelligence } = useAppSelector(
     (s) => s.registry,
   );
@@ -119,7 +114,7 @@ export function useAltitudeData(): AltitudeDataResult {
             selected: false,
             opacity: 1,
             // Semantic sizing and colors
-            bubbleSize: computeBubbleSize(c, weightingMode),
+            bubbleSize: computeBubbleSize(c, 'coverage'),
             riskColor: riskToGradientColor(c.metrics.riskIndex),
             certRingColor: certToGradientColor(c.metrics.certHealthPercent),
             volatilityScore: c.metrics.volatilityScore ?? 0,
@@ -364,7 +359,6 @@ export function useAltitudeData(): AltitudeDataResult {
     riskAnalysis,
     marketplace,
     ontologyRelationships,
-    weightingMode,
     hiddenSectorIds,
   ]);
 
