@@ -1,116 +1,96 @@
-import { useState } from 'react';
-import { useAppSelector } from '../../store/hooks';
-import { AgentBrainPanel } from '../panels/AgentBrainPanel';
-import { useSPIRankings } from '../intelligence/useSPIRankings';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { toggleAgentBrain } from '../state/graphSlice';
+import { useAltitudeScopedIntelligence } from '../intelligence/useAltitudeScopedIntelligence';
+
+const ALTITUDE_RING_COLORS: Record<string, string> = {
+  GLOBAL: '#6366f1',
+  INDUSTRY: '#3b82f6',
+  USE_CASE: '#f59e0b',
+  STACK: '#a855f7',
+  AGENT: '#06b6d4',
+};
 
 /**
- * Persistent AI agent orb (bottom-right). Shows badge counts for
- * recommendations, risk alerts, cert expiring, and expansion opportunities.
- * Click toggles AgentBrainPanel.
+ * Persistent AI avatar (right rail, vertically centered below SystemHealthOrb).
+ * Shows altitude-scoped alert badge. Available at ALL altitudes.
+ * Renamed from AgentBrainOrb; exported as both for backward compat.
  */
-export function AgentBrainOrb() {
-  const [panelOpen, setPanelOpen] = useState(false);
+export function AgentBrainAvatar() {
+  const dispatch = useAppDispatch();
+  const agentBrainOpen = useAppSelector((s) => s.graph.agentBrainOpen);
+  const scoped = useAltitudeScopedIntelligence();
 
-  const { intents, violations } = useAppSelector((s) => s.orchestrator);
-  const { variants } = useAppSelector((s) => s.registry);
-
-  // Count proposed/detected intents (suggestions)
-  const suggestionCount = intents.filter(
-    (i) => i.status === 'proposed' || i.status === 'detected',
-  ).length;
-
-  // Count unresolved violations
-  const alertCount = violations.filter((v) => !v.resolved).length;
-
-  // Count expansion opportunities
-  const expansionCount = intents.filter((i) => i.intentType === 'expansion_opportunity').length;
-
-  // Count variants with expiring certs (approximation: pending status)
-  const certExpiringCount = variants.filter(
-    (v) => v.certificationStatus === 'pending' || v.certificationStatus === 'expired',
-  ).length;
-
-  // SPI intelligence: count high-priority industries (SPI > 70)
-  const { allRanked } = useSPIRankings();
-  const highSpiCount = allRanked.filter((r) => r.spiScore > 70).length;
-
-  const totalAlerts =
-    suggestionCount + alertCount + expansionCount + certExpiringCount + highSpiCount;
+  const totalAlerts = scoped.totalAlertCount;
   const hasAlerts = totalAlerts > 0;
+  const ringColor = ALTITUDE_RING_COLORS[scoped.altitude] ?? '#6366f1';
 
   const prefersReducedMotion =
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   return (
-    <>
-      <div className="absolute bottom-16 right-4 z-30">
-        <button
-          onClick={() => setPanelOpen(!panelOpen)}
-          className="relative w-12 h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 shadow-lg hover:shadow-indigo-500/20 transition-all hover:scale-105"
-        >
-          {/* Pulse ring for alerts */}
-          {hasAlerts && !prefersReducedMotion && (
-            <div className="absolute inset-0 rounded-full border-2 border-indigo-400/40 animate-ping" />
-          )}
+    <div className="absolute right-4 z-30" style={{ top: 'calc(50% + 48px)' }}>
+      <button
+        onClick={() => dispatch(toggleAgentBrain())}
+        className={`relative w-[52px] h-[52px] rounded-full flex items-center justify-center transition-all hover:scale-105 ${
+          agentBrainOpen ? 'ring-2 ring-indigo-400/50' : ''
+        }`}
+        style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(12px)',
+          border: `1.5px solid ${ringColor}40`,
+          boxShadow: `0 0 20px ${ringColor}15, 0 4px 12px rgba(0,0,0,0.3)`,
+        }}
+        aria-label="Toggle Agent Intelligence"
+      >
+        {/* Animated gradient ring */}
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 52 52" fill="none">
+          <circle
+            cx="26"
+            cy="26"
+            r="24.5"
+            stroke={`url(#avatar-ring-gradient)`}
+            strokeWidth="1.5"
+            strokeDasharray="60 94"
+            className={prefersReducedMotion ? '' : 'animate-ring-glow'}
+          />
+          <defs>
+            <linearGradient id="avatar-ring-gradient" x1="0" y1="0" x2="52" y2="52">
+              <stop offset="0%" stopColor="#6366f1" />
+              <stop offset="50%" stopColor="#8b5cf6" />
+              <stop offset="100%" stopColor="#06b6d4" />
+            </linearGradient>
+          </defs>
+        </svg>
 
-          {/* Brain icon */}
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M10 2C6.5 2 4 4.5 4 7c0 1.5.7 2.8 1.8 3.7-.1.5-.3 1-.6 1.5-.3.5-.2 1.1.3 1.4.5.3 1.1.2 1.4-.3.4-.6.7-1.2.9-1.8.7.3 1.4.5 2.2.5s1.5-.2 2.2-.5c.2.6.5 1.2.9 1.8.3.5.9.6 1.4.3s.6-.9.3-1.4c-.3-.5-.5-1-.6-1.5C15.3 9.8 16 8.5 16 7c0-2.5-2.5-5-6-5z"
-              fill="currentColor"
-              className="text-indigo-400"
-            />
-            <path
-              d="M8 14v3a2 2 0 002 2v0a2 2 0 002-2v-3"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="text-indigo-400/60"
-            />
-          </svg>
+        {/* Neural face icon */}
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          {/* Eyes */}
+          <circle cx="8.5" cy="10" r="2" fill={ringColor} opacity="0.9" />
+          <circle cx="15.5" cy="10" r="2" fill={ringColor} opacity="0.9" />
+          {/* Inner eye dots */}
+          <circle cx="9" cy="9.5" r="0.6" fill="white" opacity="0.8" />
+          <circle cx="16" cy="9.5" r="0.6" fill="white" opacity="0.8" />
+          {/* Smile arc */}
+          <path
+            d="M8.5 16c0 0 1.5 2.5 3.5 2.5s3.5-2.5 3.5-2.5"
+            stroke={ringColor}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            opacity="0.8"
+          />
+        </svg>
 
-          {/* Total alert badge */}
-          {totalAlerts > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
-              {totalAlerts > 99 ? '99+' : totalAlerts}
-            </span>
-          )}
-        </button>
-
-        {/* Badge pills below orb */}
-        <div className="mt-2 flex flex-col items-end gap-1">
-          {suggestionCount > 0 && (
-            <BadgePill count={suggestionCount} label="suggestions" color="#6366f1" />
-          )}
-          {alertCount > 0 && <BadgePill count={alertCount} label="risk alerts" color="#ef4444" />}
-          {certExpiringCount > 0 && (
-            <BadgePill count={certExpiringCount} label="cert expiring" color="#f59e0b" />
-          )}
-          {expansionCount > 0 && (
-            <BadgePill count={expansionCount} label="expansion" color="#10b981" />
-          )}
-          {highSpiCount > 0 && <BadgePill count={highSpiCount} label="high SPI" color="#a855f7" />}
-        </div>
-      </div>
-
-      {/* Panel */}
-      {panelOpen && <AgentBrainPanel onClose={() => setPanelOpen(false)} />}
-    </>
-  );
-}
-
-function BadgePill({ count, label, color }: { count: number; label: string; color: string }) {
-  return (
-    <div
-      className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-medium border"
-      style={{
-        backgroundColor: `${color}15`,
-        borderColor: `${color}30`,
-        color,
-      }}
-    >
-      <span className="font-bold">{count}</span>
-      <span>{label}</span>
+        {/* Total alert badge */}
+        {hasAlerts && (
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center shadow-lg">
+            {totalAlerts > 99 ? '99+' : totalAlerts}
+          </span>
+        )}
+      </button>
     </div>
   );
 }
+
+// Backward compatibility export
+export const AgentBrainOrb = AgentBrainAvatar;

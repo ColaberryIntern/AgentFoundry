@@ -56,7 +56,8 @@ import { SectorBoundaryOverlay } from '../overlays/SectorBoundaryOverlay';
 
 import { SectorSelectorBar } from '../widgets/SectorSelectorBar';
 import { MetricDetailPanel } from '../panels/MetricDetailPanel';
-import { AgentBrainOrb } from '../widgets/AgentBrainOrb';
+import { AgentBrainAvatar } from '../widgets/AgentBrainOrb';
+import { AgentBrainPanel } from '../panels/AgentBrainPanel';
 import { AltitudeBreadcrumb } from '../altitude/AltitudeBreadcrumb';
 import { AltitudeIndicator } from '../altitude/AltitudeIndicator';
 import { DemoModeToggle } from '../widgets/DemoModeToggle';
@@ -117,6 +118,7 @@ function GraphEngineInner() {
       (s) =>
         (s.graph as unknown as { showCrossIndustryVariants?: boolean }).showCrossIndustryVariants,
     ) ?? false;
+  const agentBrainOpen = useAppSelector((s) => s.graph.agentBrainOpen);
 
   // Altitude-scoped data (replaces useGraphData)
   const {
@@ -391,8 +393,9 @@ function GraphEngineInner() {
       {/* System Health Orb */}
       <SystemHealthOrb />
 
-      {/* Agent Brain Orb (GLOBAL only) */}
-      {altitude === 'GLOBAL' && <AgentBrainOrb />}
+      {/* Agent Brain Avatar (all altitudes) + Panel */}
+      <AgentBrainAvatar />
+      {agentBrainOpen && <AgentBrainPanel />}
 
       {/* Traverse Menu */}
       <TraverseMenu />

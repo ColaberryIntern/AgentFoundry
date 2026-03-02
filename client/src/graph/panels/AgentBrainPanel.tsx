@@ -1,103 +1,148 @@
-import { useState } from 'react';
-import { useAppSelector } from '../../store/hooks';
-import { useSPIRankings } from '../intelligence/useSPIRankings';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { useAltitudeScopedIntelligence } from '../intelligence/useAltitudeScopedIntelligence';
+import { generateChatResponse } from '../intelligence/chatEngine';
+import { addChatMessage, closeAgentBrain, type ChatMessage } from '../state/graphSlice';
 import type { SPIResult, SPIBreakdown } from '../intelligence/spiEngine';
-import { getMacroSector } from '../altitude/macroSectors';
-import type { MacroSectorId } from '../altitude/macroSectors';
+import type { OrchestratorIntent, GuardrailViolation } from '../../types/orchestrator';
+import type { AgentVariant } from '../../types/compliance';
 
-type BrainTab =
-  | 'intelligence'
-  | 'suggestions'
-  | 'riskAlerts'
-  | 'expansion'
-  | 'governance'
-  | 'quickActions';
+type BrainTab = 'insights' | 'alerts' | 'opportunities' | 'askAi';
 
-const TAB_LABELS: Record<BrainTab, string> = {
-  intelligence: 'SPI Rankings',
-  suggestions: 'Suggestions',
-  riskAlerts: 'Risk Alerts',
-  expansion: 'Expansion',
-  governance: 'Governance',
-  quickActions: 'Quick Actions',
+const TAB_CONFIG: { key: BrainTab; label: string }[] = [
+  { key: 'insights', label: 'Insights' },
+  { key: 'alerts', label: 'Alerts' },
+  { key: 'opportunities', label: 'Opportunities' },
+  { key: 'askAi', label: 'Ask AI' },
+];
+
+const ALTITUDE_COLORS: Record<string, string> = {
+  GLOBAL: '#6366f1',
+  INDUSTRY: '#3b82f6',
+  USE_CASE: '#f59e0b',
+  STACK: '#a855f7',
+  AGENT: '#06b6d4',
+};
+
+const ALTITUDE_SHORT: Record<string, string> = {
+  GLOBAL: 'Global',
+  INDUSTRY: 'Industry',
+  USE_CASE: 'Use Case',
+  STACK: 'Stack',
+  AGENT: 'Agent',
 };
 
 /**
- * 6-tab slide-in panel for the AI Agent Brain.
- * The Intelligence tab is the default and shows context-reactive SPI rankings.
+ * Redesigned Agent Intelligence panel with 4 tabs, altitude-scoped content, and chat.
+ * Pulls all data from useAltitudeScopedIntelligence instead of raw Redux selectors.
  */
-export function AgentBrainPanel({ onClose }: { onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<BrainTab>('intelligence');
-  const { intents, violations, dashboard } = useAppSelector((s) => s.orchestrator);
-  const { globalTop5, sectorTop5, industryDetail, allRanked } = useSPIRankings();
+export function AgentBrainPanel() {
+  const dispatch = useAppDispatch();
+  const [activeTab, setActiveTab] = useState<BrainTab>('insights');
+  const scoped = useAltitudeScopedIntelligence();
+  const chatMessages = useAppSelector((s) => s.graph.chatMessages);
 
-  const suggestionCount = intents.filter(
-    (i) => i.status === 'proposed' || i.status === 'detected',
-  ).length;
-  const alertCount = violations.filter((v) => !v.resolved).length;
-  const expansionCount = intents.filter((i) => i.intentType === 'expansion_opportunity').length;
-  const governanceCount = intents.filter(
-    (i) => i.intentType === 'certification_renewal' || i.intentType === 'drift_remediation',
-  ).length;
-  const highSpiCount = allRanked.filter((r) => r.spiScore > 70).length;
+  const altColor = ALTITUDE_COLORS[scoped.altitude] ?? '#6366f1';
+  const altLabel = ALTITUDE_SHORT[scoped.altitude] ?? 'Global';
+
+  // Tab counts
+  const insightCount = scoped.spiInsights
+    ? Array.isArray(scoped.spiInsights)
+      ? scoped.spiInsights.length
+      : 1
+    : 0;
+  const alertCount = scoped.riskAlerts.length + scoped.governance.expiringVariants.length;
+  const opCount = scoped.suggestions.length + scoped.expansions.length;
 
   const tabCounts: Record<BrainTab, number> = {
-    intelligence: highSpiCount,
-    suggestions: suggestionCount,
-    riskAlerts: alertCount,
-    expansion: expansionCount,
-    governance: governanceCount,
-    quickActions: 0,
+    insights: insightCount,
+    alerts: alertCount + scoped.governance.intents.length,
+    opportunities: opCount,
+    askAi: chatMessages.length,
   };
 
-  const confidencePercent = dashboard ? Math.round((dashboard.systemConfidence ?? 0) * 100) : 0;
-
   return (
-    <div className="absolute top-0 right-0 bottom-0 w-[320px] z-50 animate-slide-in">
+    <div className="absolute top-0 right-0 bottom-0 w-[380px] z-50 animate-slide-in">
       <div className="h-full bg-[var(--surface-primary)]/95 backdrop-blur-xl border-l border-white/5 shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-white/5">
+        <div className="px-4 py-3 border-b border-white/5 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-[12px] font-semibold text-[var(--text-primary)]">
-                Agent Intelligence
-              </h3>
-              <div className="text-[9px] text-[var(--text-muted)] mt-0.5">
-                Autonomy confidence:{' '}
-                <span className="text-indigo-400 font-bold">{confidencePercent}%</span>
+            <div className="flex items-center gap-2">
+              {/* Mini avatar icon */}
+              <div
+                className="w-7 h-7 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: `${altColor}20`, border: `1px solid ${altColor}40` }}
+              >
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+                  <circle cx="7.5" cy="8" r="1.5" fill={altColor} />
+                  <circle cx="12.5" cy="8" r="1.5" fill={altColor} />
+                  <path
+                    d="M7 13c0 0 1.5 2 3 2s3-2 3-2"
+                    stroke={altColor}
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-[12px] font-semibold text-[var(--text-primary)]">
+                  Intelligence
+                </h3>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:bg-white/5 transition-colors"
-            >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path
-                  d="M2 2L10 10M10 2L2 10"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Altitude context chip */}
+              <div
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold"
+                style={{
+                  backgroundColor: `${altColor}15`,
+                  border: `1px solid ${altColor}30`,
+                  color: altColor,
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: altColor }} />
+                {altLabel}
+              </div>
+              <button
+                onClick={() => dispatch(closeAgentBrain())}
+                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:bg-white/5 transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path
+                    d="M2 2L10 10M10 2L2 10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-0.5 mt-3 overflow-x-auto">
-            {(Object.keys(TAB_LABELS) as BrainTab[]).map((tab) => (
+          {/* Context label */}
+          <div className="text-[9px] text-[var(--text-muted)] mt-1 truncate">
+            {scoped.contextLabel}
+            {scoped.scopeNote && (
+              <span className="ml-1 text-amber-400/80 italic"> — {scoped.scopeNote}</span>
+            )}
+          </div>
+
+          {/* Tab row */}
+          <div className="flex gap-1 mt-2.5">
+            {TAB_CONFIG.map(({ key, label }) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex items-center gap-1 px-2 py-1 text-[9px] font-medium rounded-md whitespace-nowrap transition-colors ${
-                  activeTab === tab
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[9px] font-medium rounded-md whitespace-nowrap transition-colors ${
+                  activeTab === key
                     ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                     : 'text-[var(--text-muted)] hover:bg-white/5 border border-transparent'
                 }`}
               >
-                {TAB_LABELS[tab]}
-                {tabCounts[tab] > 0 && (
+                {label}
+                {tabCounts[key] > 0 && (
                   <span className="min-w-[14px] h-3.5 px-1 rounded-full bg-indigo-500/30 text-indigo-300 text-[8px] font-bold flex items-center justify-center">
-                    {tabCounts[tab]}
+                    {tabCounts[key]}
                   </span>
                 )}
               </button>
@@ -105,28 +150,23 @@ export function AgentBrainPanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        {/* Tab content */}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
-          {activeTab === 'intelligence' && (
-            <IntelligenceTab
-              globalTop5={globalTop5}
-              sectorTop5={sectorTop5}
-              industryDetail={industryDetail}
-            />
-          )}
-          {activeTab === 'suggestions' && <SuggestionsTab />}
-          {activeTab === 'riskAlerts' && <RiskAlertsTab />}
-          {activeTab === 'expansion' && <ExpansionTab />}
-          {activeTab === 'governance' && <GovernanceTab />}
-          {activeTab === 'quickActions' && <QuickActionsTab />}
+        {/* Tab content — scrollbar hidden */}
+        <div className="flex-1 overflow-y-auto scrollbar-none px-4 py-3">
+          {activeTab === 'insights' && <InsightsTab scoped={scoped} />}
+          {activeTab === 'alerts' && <AlertsTab scoped={scoped} />}
+          {activeTab === 'opportunities' && <OpportunitiesTab scoped={scoped} />}
+          {activeTab === 'askAi' && <AskAITab messages={chatMessages} />}
         </div>
+
+        {/* Chat input — always visible */}
+        <ChatInput scoped={scoped} />
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Intelligence Tab — Context-Reactive SPI Rankings
+// Insights Tab — SPI Rankings (altitude-aware)
 // ---------------------------------------------------------------------------
 
 const BREAKDOWN_LABELS: Record<keyof SPIBreakdown, { label: string; color: string }> = {
@@ -138,51 +178,29 @@ const BREAKDOWN_LABELS: Record<keyof SPIBreakdown, { label: string; color: strin
   agentSaturationScore: { label: 'Agent Gap', color: '#06b6d4' },
 };
 
-function IntelligenceTab({
-  globalTop5,
-  sectorTop5,
-  industryDetail,
-}: {
-  globalTop5: SPIResult[];
-  sectorTop5: SPIResult[];
-  industryDetail: SPIResult | null;
-}) {
-  const focusedSectorId =
-    useAppSelector(
-      (s) => (s.graph as unknown as { focusedSectorId?: MacroSectorId | null }).focusedSectorId,
-    ) ?? null;
+function InsightsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedIntelligence> }) {
+  const { spiInsights, contextLabel } = scoped;
 
-  // Mode C: Industry Detail
-  if (industryDetail) {
-    return <IndustryDetailView result={industryDetail} />;
+  if (!spiInsights) {
+    return <EmptyTab message="No SPI data available at this level." />;
   }
 
-  // Mode B: Sector Top 5
-  if (focusedSectorId && sectorTop5.length > 0) {
-    const sectorConfig = getMacroSector(focusedSectorId);
-    return (
-      <div className="space-y-3">
-        <div className="text-[10px] font-semibold text-[var(--text-primary)]">
-          Top Priorities in {sectorConfig.label}
-        </div>
-        {sectorTop5.map((result) => (
-          <SPICard key={result.industryCode} result={result} />
-        ))}
-      </div>
-    );
+  // Single industry detail
+  if (!Array.isArray(spiInsights)) {
+    return <IndustryDetailView result={spiInsights} />;
   }
 
-  // Mode A: Global Top 5
-  if (globalTop5.length === 0) {
+  // Ranked list
+  if (spiInsights.length === 0) {
     return <EmptyTab message="No industries loaded for SPI analysis." />;
   }
 
   return (
     <div className="space-y-3">
       <div className="text-[10px] font-semibold text-[var(--text-primary)]">
-        Global Strategic Priorities
+        Strategic Priorities — {contextLabel}
       </div>
-      {globalTop5.map((result) => (
+      {spiInsights.map((result) => (
         <SPICard key={result.industryCode} result={result} />
       ))}
     </div>
@@ -230,7 +248,6 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
         {result.title} — SPI Analysis
       </div>
 
-      {/* Large SPI score */}
       <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
         <div className="text-[24px] font-bold text-indigo-400">{result.spiScore.toFixed(0)}</div>
         <div>
@@ -241,7 +258,6 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
         </div>
       </div>
 
-      {/* Sub-score breakdown bars */}
       <div className="space-y-2">
         {(Object.keys(BREAKDOWN_LABELS) as (keyof SPIBreakdown)[]).map((key) => {
           const { label, color } = BREAKDOWN_LABELS[key];
@@ -269,7 +285,6 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
         })}
       </div>
 
-      {/* Recommended action */}
       <div className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
         <div className="text-[9px] font-semibold text-emerald-400 mb-0.5">Recommended Action</div>
         <div className="text-[9px] text-[var(--text-primary)]">{result.recommendedAction}</div>
@@ -279,183 +294,246 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
 }
 
 // ---------------------------------------------------------------------------
-// Existing Tabs (unchanged)
+// Alerts Tab — Risk Alerts + Governance merged
 // ---------------------------------------------------------------------------
 
-function SuggestionsTab() {
-  const { intents } = useAppSelector((s) => s.orchestrator);
-  const suggestions = intents.filter((i) => i.status === 'proposed' || i.status === 'detected');
+function AlertsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedIntelligence> }) {
+  const { riskAlerts, governance } = scoped;
+  const hasContent =
+    riskAlerts.length > 0 ||
+    governance.intents.length > 0 ||
+    governance.expiringVariants.length > 0;
 
-  if (suggestions.length === 0) {
-    return <EmptyTab message="No pending suggestions." />;
+  if (!hasContent) {
+    return <EmptyTab message="No alerts at this level." />;
   }
 
   return (
-    <div className="space-y-2">
-      {suggestions.map((intent) => (
-        <IntentCard key={intent.id} intent={intent} />
-      ))}
-    </div>
-  );
-}
-
-function RiskAlertsTab() {
-  const { violations } = useAppSelector((s) => s.orchestrator);
-  const unresolved = violations.filter((v) => !v.resolved);
-
-  if (unresolved.length === 0) {
-    return <EmptyTab message="No unresolved risk alerts." />;
-  }
-
-  return (
-    <div className="space-y-2">
-      {unresolved.map((v) => (
-        <div key={v.id} className="px-3 py-2 rounded-lg bg-white/3 border border-white/5">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-medium text-[var(--text-primary)] capitalize">
-              {v.guardrailType.replace(/_/g, ' ')}
-            </span>
-            <span
-              className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
-                v.severity === 'block'
-                  ? 'bg-red-500/20 text-red-400'
-                  : 'bg-amber-500/20 text-amber-400'
-              }`}
-            >
-              {v.severity}
-            </span>
-          </div>
-          <div className="text-[9px] text-[var(--text-muted)]">
-            {JSON.stringify(v.violationDetails).slice(0, 80)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ExpansionTab() {
-  const { intents } = useAppSelector((s) => s.orchestrator);
-  const expansions = intents.filter((i) => i.intentType === 'expansion_opportunity');
-
-  if (expansions.length === 0) {
-    return <EmptyTab message="No expansion opportunities detected." />;
-  }
-
-  return (
-    <div className="space-y-2">
-      {expansions.map((intent) => (
-        <IntentCard key={intent.id} intent={intent} />
-      ))}
-    </div>
-  );
-}
-
-function GovernanceTab() {
-  const { intents } = useAppSelector((s) => s.orchestrator);
-  const { variants } = useAppSelector((s) => s.registry);
-
-  const governanceIntents = intents.filter(
-    (i) => i.intentType === 'certification_renewal' || i.intentType === 'drift_remediation',
-  );
-
-  const expiringVariants = variants.filter(
-    (v) => v.certificationStatus === 'pending' || v.certificationStatus === 'expired',
-  );
-
-  return (
-    <div className="space-y-3">
-      {governanceIntents.length > 0 && (
-        <div>
-          <div className="text-[9px] text-[var(--text-muted)] font-medium mb-1.5">
-            Governance Intents
-          </div>
-          <div className="space-y-2">
-            {governanceIntents.map((intent) => (
-              <IntentCard key={intent.id} intent={intent} />
-            ))}
-          </div>
-        </div>
+    <div className="space-y-4">
+      {/* Risk alerts */}
+      {riskAlerts.length > 0 && (
+        <Section title={`Risk Alerts (${riskAlerts.length})`}>
+          {riskAlerts.map((v) => (
+            <ViolationCard key={v.id} violation={v} />
+          ))}
+        </Section>
       )}
 
-      {expiringVariants.length > 0 && (
-        <div>
-          <div className="text-[9px] text-[var(--text-muted)] font-medium mb-1.5">
-            Cert Attention Required ({expiringVariants.length})
-          </div>
-          <div className="space-y-1.5">
-            {expiringVariants.slice(0, 8).map((v) => (
-              <div
-                key={v.id}
-                className="flex items-center justify-between px-2 py-1 rounded-md bg-white/3"
-              >
-                <span className="text-[9px] text-[var(--text-primary)] truncate">
-                  {v.name ?? v.id}
-                </span>
-                <span
-                  className={`text-[8px] font-bold ${
-                    v.certificationStatus === 'expired' ? 'text-red-400' : 'text-amber-400'
-                  }`}
-                >
-                  {v.certificationStatus}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Governance intents */}
+      {governance.intents.length > 0 && (
+        <Section title={`Governance Intents (${governance.intents.length})`}>
+          {governance.intents.map((intent) => (
+            <IntentCard key={intent.id} intent={intent} />
+          ))}
+        </Section>
       )}
 
-      {governanceIntents.length === 0 && expiringVariants.length === 0 && (
-        <EmptyTab message="Governance is clean." />
+      {/* Expiring variants */}
+      {governance.expiringVariants.length > 0 && (
+        <Section title={`Cert Attention (${governance.expiringVariants.length})`}>
+          {governance.expiringVariants.slice(0, 10).map((v) => (
+            <VariantCertCard key={v.id} variant={v} />
+          ))}
+        </Section>
       )}
     </div>
   );
 }
 
-function QuickActionsTab() {
-  return (
-    <div className="space-y-2">
-      <QuickActionButton label="Run Full Scan" icon="scan" color="#6366f1" />
-      <QuickActionButton label="View Pending Approvals" icon="approve" color="#f59e0b" />
-      <QuickActionButton label="Open Compliance Monitor" icon="compliance" color="#10b981" />
-      <QuickActionButton label="Export Intelligence Report" icon="export" color="#3b82f6" />
-      <QuickActionButton label="Refresh All Data" icon="refresh" color="#a855f7" />
-    </div>
-  );
-}
+// ---------------------------------------------------------------------------
+// Opportunities Tab — Suggestions + Expansion merged
+// ---------------------------------------------------------------------------
 
-function QuickActionButton({ label, color }: { label: string; icon: string; color: string }) {
-  return (
-    <button
-      className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-colors hover:scale-[1.01]"
-      style={{
-        backgroundColor: `${color}10`,
-        borderColor: `${color}20`,
-      }}
-    >
-      <span
-        className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold"
-        style={{ backgroundColor: `${color}20`, color }}
-      >
-        &gt;
-      </span>
-      <span className="text-[10px] font-medium text-[var(--text-primary)]">{label}</span>
-    </button>
-  );
-}
-
-function IntentCard({
-  intent,
+function OpportunitiesTab({
+  scoped,
 }: {
-  intent: {
-    id: string;
-    title: string;
-    intentType: string;
-    priority: string;
-    confidenceScore: number;
-    status: string;
-  };
+  scoped: ReturnType<typeof useAltitudeScopedIntelligence>;
 }) {
+  const { suggestions, expansions } = scoped;
+  const hasContent = suggestions.length > 0 || expansions.length > 0;
+
+  if (!hasContent) {
+    return <EmptyTab message="No opportunities at this level." />;
+  }
+
+  return (
+    <div className="space-y-4">
+      {suggestions.length > 0 && (
+        <Section title={`Suggestions (${suggestions.length})`}>
+          {suggestions.map((intent) => (
+            <IntentCard key={intent.id} intent={intent} />
+          ))}
+        </Section>
+      )}
+
+      {expansions.length > 0 && (
+        <Section title={`Expansion Opportunities (${expansions.length})`}>
+          {expansions.map((intent) => (
+            <IntentCard key={intent.id} intent={intent} />
+          ))}
+        </Section>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ask AI Tab — Chat conversation
+// ---------------------------------------------------------------------------
+
+function AskAITab({ messages }: { messages: ChatMessage[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages.length]);
+
+  if (messages.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4">
+        <div className="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-3">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="7.5" cy="8" r="1.5" fill="#6366f1" />
+            <circle cx="12.5" cy="8" r="1.5" fill="#6366f1" />
+            <path
+              d="M7 13c0 0 1.5 2 3 2s3-2 3-2"
+              stroke="#6366f1"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+        <div className="text-[11px] font-medium text-[var(--text-primary)] mb-1">
+          Ask about this level
+        </div>
+        <div className="text-[9px] text-[var(--text-muted)] max-w-[220px]">
+          Ask about risks, suggestions, certifications, expansion opportunities, or SPI scores at
+          the current altitude.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={scrollRef} className="space-y-3">
+      {messages.map((msg) => (
+        <ChatBubble key={msg.id} message={msg} />
+      ))}
+    </div>
+  );
+}
+
+function ChatBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === 'user';
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[85%] px-3 py-2 rounded-xl text-[10px] leading-relaxed ${
+          isUser
+            ? 'bg-indigo-500/20 text-indigo-200 border border-indigo-500/20 rounded-br-sm'
+            : 'bg-white/5 text-[var(--text-primary)] border border-white/5 rounded-bl-sm'
+        }`}
+      >
+        <div className="whitespace-pre-wrap break-words">{message.content}</div>
+        <div className="text-[7px] text-[var(--text-muted)] mt-1 opacity-60">
+          {ALTITUDE_SHORT[message.altitude] ?? message.altitude}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Chat Input — always visible at bottom
+// ---------------------------------------------------------------------------
+
+function ChatInput({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedIntelligence> }) {
+  const dispatch = useAppDispatch();
+  const [input, setInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      const q = input.trim();
+      if (!q) return;
+
+      // Add user message
+      const userMsg: ChatMessage = {
+        id: `chat-${Date.now()}-u`,
+        role: 'user',
+        content: q,
+        timestamp: Date.now(),
+        altitude: scoped.altitude,
+      };
+      dispatch(addChatMessage(userMsg));
+
+      // Generate response
+      const response = generateChatResponse(q, scoped.altitude, scoped);
+      const assistantMsg: ChatMessage = {
+        id: `chat-${Date.now()}-a`,
+        role: 'assistant',
+        content: response,
+        timestamp: Date.now(),
+        altitude: scoped.altitude,
+      };
+      dispatch(addChatMessage(assistantMsg));
+
+      setInput('');
+    },
+    [input, scoped, dispatch],
+  );
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex-shrink-0 px-3 py-2.5 border-t border-white/5 bg-[var(--surface-primary)]/80"
+    >
+      <div className="flex items-center gap-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={`Ask about ${scoped.contextLabel}...`}
+          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-indigo-500/40 transition-colors"
+        />
+        <button
+          type="submit"
+          disabled={!input.trim()}
+          className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 hover:bg-indigo-500/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path
+              d="M1 6h10M7 2l4 4-4 4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared Cards & Helpers
+// ---------------------------------------------------------------------------
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[9px] text-[var(--text-muted)] font-medium mb-1.5">{title}</div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  );
+}
+
+function IntentCard({ intent }: { intent: OrchestratorIntent }) {
   const priorityColors: Record<string, string> = {
     critical: '#ef4444',
     high: '#f59e0b',
@@ -486,6 +564,47 @@ function IntentCard({
         <span>·</span>
         <span className="capitalize">{intent.status}</span>
       </div>
+    </div>
+  );
+}
+
+function ViolationCard({ violation }: { violation: GuardrailViolation }) {
+  return (
+    <div className="px-3 py-2 rounded-lg bg-white/3 border border-white/5">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] font-medium text-[var(--text-primary)] capitalize">
+          {violation.guardrailType.replace(/_/g, ' ')}
+        </span>
+        <span
+          className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
+            violation.severity === 'block'
+              ? 'bg-red-500/20 text-red-400'
+              : 'bg-amber-500/20 text-amber-400'
+          }`}
+        >
+          {violation.severity}
+        </span>
+      </div>
+      <div className="text-[9px] text-[var(--text-muted)]">
+        {JSON.stringify(violation.violationDetails).slice(0, 80)}
+      </div>
+    </div>
+  );
+}
+
+function VariantCertCard({ variant }: { variant: AgentVariant }) {
+  return (
+    <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-white/3">
+      <span className="text-[9px] text-[var(--text-primary)] truncate">
+        {variant.name ?? variant.id}
+      </span>
+      <span
+        className={`text-[8px] font-bold ${
+          variant.certificationStatus === 'expired' ? 'text-red-400' : 'text-amber-400'
+        }`}
+      >
+        {variant.certificationStatus}
+      </span>
     </div>
   );
 }

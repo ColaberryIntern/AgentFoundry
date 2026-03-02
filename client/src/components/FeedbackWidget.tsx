@@ -119,7 +119,7 @@ function FeedbackWidget() {
       <button
         onClick={handleToggle}
         aria-label={isOpen ? 'Close feedback form' : 'Send feedback'}
-        className={`fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
+        className={`fixed bottom-6 left-[270px] z-40 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 ${
           isOpen
             ? 'bg-gray-600 hover:bg-gray-700 dark:bg-gray-500 dark:hover:bg-gray-400 rotate-90'
             : 'bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400 hover:scale-110'
@@ -151,7 +151,7 @@ function FeedbackWidget() {
       {/* Feedback panel */}
       <div
         ref={panelRef}
-        className={`fixed bottom-20 right-6 z-40 w-80 max-w-[calc(100vw-3rem)] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 transition-all duration-200 origin-bottom-right ${
+        className={`fixed bottom-20 left-[270px] z-40 w-80 max-w-[calc(100vw-3rem)] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 transition-all duration-200 origin-bottom-left ${
           isOpen
             ? 'opacity-100 scale-100 translate-y-0'
             : 'opacity-0 scale-95 translate-y-2 pointer-events-none'

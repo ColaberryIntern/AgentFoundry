@@ -15,6 +15,18 @@ import type { WeightingMode } from '../altitude/weightingModes';
 import type { MacroSectorId } from '../altitude/macroSectors';
 
 // ---------------------------------------------------------------------------
+// Chat message type for Agent Intelligence panel
+// ---------------------------------------------------------------------------
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  altitude: AltitudeLevel;
+}
+
+// ---------------------------------------------------------------------------
 // Ontology thunk (fetches relationships for graph edges)
 // ---------------------------------------------------------------------------
 
@@ -32,6 +44,8 @@ interface GraphSliceState extends GraphUIState {
   activeMetricPanel: string | null;
   demoMode: boolean;
   showCrossIndustryVariants: boolean;
+  agentBrainOpen: boolean;
+  chatMessages: ChatMessage[];
   _ontologyBackup: OntologyRelationship[] | null;
 }
 
@@ -46,6 +60,8 @@ const initialState: GraphSliceState = {
   activeMetricPanel: null,
   demoMode: false,
   showCrossIndustryVariants: false,
+  agentBrainOpen: false,
+  chatMessages: [],
   _ontologyBackup: null,
 };
 
@@ -328,6 +344,28 @@ const graphSlice = createSlice({
       state.showCrossIndustryVariants = !state.showCrossIndustryVariants;
     },
 
+    // -- Agent Brain panel --
+    openAgentBrain(state) {
+      state.agentBrainOpen = true;
+    },
+
+    closeAgentBrain(state) {
+      state.agentBrainOpen = false;
+    },
+
+    toggleAgentBrain(state) {
+      state.agentBrainOpen = !state.agentBrainOpen;
+    },
+
+    addChatMessage(state, action: PayloadAction<ChatMessage>) {
+      state.chatMessages.push(action.payload);
+      if (state.chatMessages.length > 50) state.chatMessages.shift();
+    },
+
+    clearChatMessages(state) {
+      state.chatMessages = [];
+    },
+
     loadDemoOntology(state, action: PayloadAction<OntologyRelationship[]>) {
       state._ontologyBackup = state.ontology.relationships;
       state.ontology.relationships = action.payload;
@@ -405,6 +443,11 @@ export const {
   setActiveMetricPanel,
   setDemoMode,
   toggleCrossIndustryVariants,
+  openAgentBrain,
+  closeAgentBrain,
+  toggleAgentBrain,
+  addChatMessage,
+  clearChatMessages,
   loadDemoOntology,
   restoreLiveOntology,
   enterSimulation,

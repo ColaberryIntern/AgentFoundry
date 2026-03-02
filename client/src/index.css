@@ -43,6 +43,24 @@
     animation: fade-in-down 0.4s ease-out;
   }
 
+  /* Hidden scrollbar utility */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Animated gradient ring for AI avatar */
+  @keyframes ring-glow {
+    0%, 100% { stroke-dashoffset: 0; opacity: 0.6; }
+    50% { stroke-dashoffset: -80; opacity: 1; }
+  }
+  .animate-ring-glow {
+    animation: ring-glow 4s ease-in-out infinite;
+  }
+
   /* Smooth number transition for metric values */
   .metric-value-transition {
     transition: color 0.3s ease, transform 0.3s ease;
@@ -70,7 +88,8 @@
   .animate-slide-in,
   .animate-fade-in-down,
   .animate-spin,
-  .animate-ping {
+  .animate-ping,
+  .animate-ring-glow {
     animation: none !important;
   }
 
