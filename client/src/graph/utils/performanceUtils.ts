@@ -39,3 +39,32 @@ export function scoreToColor(score: number): string {
   if (score >= 50) return '#f59e0b';
   return '#ef4444';
 }
+
+/** Interpolate between two hex colours. t = 0..1. */
+export function interpolateColor(hex1: string, hex2: string, t: number): string {
+  const ct = clamp(t, 0, 1);
+  const r1 = parseInt(hex1.slice(1, 3), 16);
+  const g1 = parseInt(hex1.slice(3, 5), 16);
+  const b1 = parseInt(hex1.slice(5, 7), 16);
+  const r2 = parseInt(hex2.slice(1, 3), 16);
+  const g2 = parseInt(hex2.slice(3, 5), 16);
+  const b2 = parseInt(hex2.slice(5, 7), 16);
+  const r = Math.round(lerp(r1, r2, ct));
+  const g = Math.round(lerp(g1, g2, ct));
+  const b = Math.round(lerp(b1, b2, ct));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/** Continuous risk gradient: 0(low)→blue, 50→amber, 100(high)→red. */
+export function riskToGradientColor(riskIndex: number): string {
+  const v = clamp(riskIndex, 0, 100);
+  if (v <= 50) return interpolateColor('#3b82f6', '#f59e0b', v / 50);
+  return interpolateColor('#f59e0b', '#ef4444', (v - 50) / 50);
+}
+
+/** Certification coverage gradient: 0(low)→red, 60→amber, 100(high)→green. */
+export function certToGradientColor(certPercent: number): string {
+  const v = clamp(certPercent, 0, 100);
+  if (v >= 60) return interpolateColor('#f59e0b', '#10b981', (v - 60) / 40);
+  return interpolateColor('#ef4444', '#f59e0b', v / 60);
+}

@@ -10,12 +10,20 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { useAppDispatch } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { useAltitudeData } from '../altitude/useAltitudeData';
 import { useAltitudeLayout } from '../altitude/useAltitudeLayout';
 import { useAltitudeController } from '../altitude/useAltitudeController';
 import { getNodeTypeFromId } from './nodeTransformers';
-import { hoverNode, deselectAll, hideContextMenu } from '../state/graphSlice';
+import {
+  hoverNode,
+  deselectAll,
+  hideContextMenu,
+  setWeightingMode,
+  toggleHeatmap,
+} from '../state/graphSlice';
+import type { WeightingMode } from '../altitude/weightingModes';
+import { WEIGHTING_CONFIGS } from '../altitude/weightingModes';
 
 // Custom node imports (detail nodes)
 import { IndustryNode } from '../nodes/IndustryNode';
@@ -42,6 +50,8 @@ import { ModeToolbar } from '../modes/ModeToolbar';
 import { CommandConsole } from '../console/CommandConsole';
 import { SimulationBanner } from '../simulation/SimulationBanner';
 import { SystemHealthOrb } from '../widgets/SystemHealthOrb';
+import { GlobalMetricsStrip } from '../widgets/GlobalMetricsStrip';
+import { HeatmapOverlay } from '../overlays/HeatmapOverlay';
 import { AltitudeBreadcrumb } from '../altitude/AltitudeBreadcrumb';
 import { AltitudeIndicator } from '../altitude/AltitudeIndicator';
 import { ALTITUDE_LABELS } from '../altitude/altitudeTypes';
@@ -84,9 +94,45 @@ const miniMapColorMap: Record<string, string> = {
   stackCluster: '#a855f7',
 };
 
+// Weighting mode toggle — only shown at GLOBAL altitude
+function WeightingModeToggle({
+  current,
+  onSelect,
+}: {
+  current: WeightingMode;
+  onSelect: (mode: WeightingMode) => void;
+}) {
+  const modes = Object.values(WEIGHTING_CONFIGS);
+  return (
+    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-primary)]/80 backdrop-blur-md border border-white/5">
+      {modes.map((m) => (
+        <button
+          key={m.id}
+          onClick={() => onSelect(m.id)}
+          title={m.description}
+          className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
+            current === m.id
+              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+              : 'text-[var(--text-muted)] hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function GraphEngineInner() {
   const dispatch = useAppDispatch();
   const altitudeCtrl = useAltitudeController();
+  const weightingMode =
+    useAppSelector(
+      (s) => (s.graph as unknown as { weightingMode?: WeightingMode }).weightingMode,
+    ) ?? 'coverage';
+  const heatmapEnabled =
+    useAppSelector((s) => (s.graph as unknown as { heatmapEnabled?: boolean }).heatmapEnabled) ??
+    false;
 
   // Altitude-scoped data (replaces useGraphData)
   const {
@@ -206,6 +252,9 @@ function GraphEngineInner() {
         />
       </ReactFlow>
 
+      {/* Heatmap overlay (behind nodes, GLOBAL only) */}
+      {altitude === 'GLOBAL' && heatmapEnabled && <HeatmapOverlay />}
+
       {/* Altitude Navigation */}
       <AltitudeBreadcrumb />
       <AltitudeIndicator />
@@ -213,8 +262,31 @@ function GraphEngineInner() {
       {/* Simulation Banner (top) */}
       <SimulationBanner />
 
+      {/* Global Metrics Strip (GLOBAL only) */}
+      {altitude === 'GLOBAL' && <GlobalMetricsStrip />}
+
       {/* Mode Toolbar overlay */}
       <ModeToolbar />
+
+      {/* Weighting Mode + Heatmap Toggle (GLOBAL only) */}
+      {altitude === 'GLOBAL' && (
+        <div className="absolute top-20 left-4 z-30 flex flex-col gap-2">
+          <WeightingModeToggle
+            current={weightingMode}
+            onSelect={(mode) => dispatch(setWeightingMode(mode))}
+          />
+          <button
+            onClick={() => dispatch(toggleHeatmap())}
+            className={`self-start px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors border ${
+              heatmapEnabled
+                ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                : 'text-[var(--text-muted)] hover:bg-white/5 border-white/5'
+            } bg-[var(--surface-primary)]/80 backdrop-blur-md`}
+          >
+            Heatmap {heatmapEnabled ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      )}
 
       {/* System Health Orb */}
       <SystemHealthOrb />

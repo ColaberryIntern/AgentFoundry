@@ -19,7 +19,10 @@ import {
   riskToNode,
   marketplaceToNode,
 } from '../engine/nodeTransformers';
-import { scoreToColor } from '../utils/performanceUtils';
+import { riskToGradientColor, certToGradientColor } from '../utils/performanceUtils';
+import { getMacroSector } from './macroSectors';
+import { computeBubbleSize } from './weightingModes';
+import type { WeightingMode } from './weightingModes';
 
 // ---------------------------------------------------------------------------
 // Hook Return Type
@@ -39,7 +42,11 @@ export interface AltitudeDataResult {
 // ---------------------------------------------------------------------------
 
 export function useAltitudeData(): AltitudeDataResult {
-  const { currentAltitude, altitudeContext } = useAppSelector((s) => s.graph);
+  const { currentAltitude, altitudeContext, hoveredNodeId } = useAppSelector((s) => s.graph);
+  const weightingMode =
+    useAppSelector(
+      (s) => (s.graph as unknown as { weightingMode?: WeightingMode }).weightingMode,
+    ) ?? 'coverage';
   const { industries, useCases, skeletons, variants, intelligence } = useAppSelector(
     (s) => s.registry,
   );
@@ -66,7 +73,7 @@ export function useAltitudeData(): AltitudeDataResult {
     }
 
     // -----------------------------------------------------------------
-    // GLOBAL: Industry cluster bubbles
+    // GLOBAL: Industry cluster bubbles (semantic intelligence surface)
     // -----------------------------------------------------------------
     function buildGlobalNodes(): { nodes: Node[]; edges: Edge[] } {
       const clusters = aggregateIndustryClusters(
@@ -76,29 +83,55 @@ export function useAltitudeData(): AltitudeDataResult {
         riskAnalysis ?? [],
       );
 
-      const nodes: Node[] = clusters.map((c) => ({
-        id: `indcluster-${c.code}`,
-        type: 'industryClusterNode',
-        position: { x: 0, y: 0 },
-        data: {
-          nodeType: 'industryCluster',
-          label: c.title,
-          sublabel: `NAICS ${c.code}`,
-          code: c.code,
-          title: c.title,
-          sector: c.sector,
-          useCaseCount: c.useCaseCount,
-          stackCount: c.stackCount,
-          agentCount: c.agentCount,
-          metrics: c.metrics,
-          emphasis: 'primary',
-          selected: false,
-          opacity: 1,
-          // Size/color hints for the node component
-          bubbleSize: Math.max(80, Math.min(200, 80 + c.useCaseCount * 8)),
-          riskColor: scoreToColor(100 - c.metrics.riskIndex),
-        },
-      }));
+      // Determine hovered macro-sector for focus mode
+      let hoveredMacroSector: string | null = null;
+      if (hoveredNodeId && hoveredNodeId.startsWith('indcluster-')) {
+        const hoveredCode = hoveredNodeId.replace('indcluster-', '');
+        const hoveredCluster = clusters.find((c) => c.code === hoveredCode);
+        if (hoveredCluster) {
+          hoveredMacroSector = getMacroSector(hoveredCluster.sector)?.id ?? null;
+        }
+      }
+
+      const nodes: Node[] = clusters.map((c) => {
+        const macroSector = getMacroSector(c.sector);
+        const macroSectorId = macroSector?.id ?? 'other';
+        const macroSectorLabel = macroSector?.label ?? 'Other';
+
+        // Focus mode: fade non-cluster-mates when hovering
+        let opacity = 1;
+        if (hoveredMacroSector && macroSectorId !== hoveredMacroSector) {
+          opacity = 0.2;
+        }
+
+        return {
+          id: `indcluster-${c.code}`,
+          type: 'industryClusterNode',
+          position: { x: 0, y: 0 },
+          data: {
+            nodeType: 'industryCluster',
+            label: c.title,
+            sublabel: `NAICS ${c.code}`,
+            code: c.code,
+            title: c.title,
+            sector: c.sector,
+            useCaseCount: c.useCaseCount,
+            stackCount: c.stackCount,
+            agentCount: c.agentCount,
+            metrics: c.metrics,
+            emphasis: 'primary',
+            selected: false,
+            opacity,
+            // Semantic sizing and colors
+            bubbleSize: computeBubbleSize(c, weightingMode),
+            riskColor: riskToGradientColor(c.metrics.riskIndex),
+            certRingColor: certToGradientColor(c.metrics.certHealthPercent),
+            volatilityScore: c.metrics.volatilityScore ?? 0,
+            macroSectorId,
+            macroSectorLabel,
+          },
+        };
+      });
 
       const edges = buildAltitudeEdges('GLOBAL', { industryClusters: clusters });
       return { nodes, edges };
@@ -335,6 +368,8 @@ export function useAltitudeData(): AltitudeDataResult {
     riskAnalysis,
     marketplace,
     ontologyRelationships,
+    weightingMode,
+    hoveredNodeId,
   ]);
 
   return {

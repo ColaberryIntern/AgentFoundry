@@ -11,6 +11,7 @@ import { registryApi } from '../../services/registryApi';
 import type { OntologyRelationship } from '../../types/compliance';
 import type { AltitudeLevel, AltitudeContext } from '../altitude/altitudeTypes';
 import { AltitudeController } from '../altitude/AltitudeController';
+import type { WeightingMode } from '../altitude/weightingModes';
 
 // ---------------------------------------------------------------------------
 // Ontology thunk (fetches relationships for graph edges)
@@ -22,11 +23,15 @@ interface OntologyState {
 
 interface GraphSliceState extends GraphUIState {
   ontology: OntologyState;
+  weightingMode: WeightingMode;
+  heatmapEnabled: boolean;
 }
 
 const initialState: GraphSliceState = {
   ...INITIAL_GRAPH_STATE,
   ontology: { relationships: [] },
+  weightingMode: 'coverage',
+  heatmapEnabled: false,
 };
 
 export const fetchOntologyRelationships = createAsyncThunk(
@@ -240,6 +245,15 @@ const graphSlice = createSlice({
       state.altitudeAnimating = action.payload;
     },
 
+    // -- Weighting & Heatmap --
+    setWeightingMode(state, action: PayloadAction<WeightingMode>) {
+      state.weightingMode = action.payload;
+    },
+
+    toggleHeatmap(state) {
+      state.heatmapEnabled = !state.heatmapEnabled;
+    },
+
     // -- Simulation --
     enterSimulation(state) {
       state.simulationMode = true;
@@ -297,6 +311,8 @@ export const {
   descendAltitude,
   ascendAltitude,
   setAltitudeAnimating,
+  setWeightingMode,
+  toggleHeatmap,
   enterSimulation,
   exitSimulation,
   addSimulationModification,

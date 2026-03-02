@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import dagre from '@dagrejs/dagre';
-import { forceSimulation, forceCenter, forceCollide, forceManyBody, forceLink } from 'd3-force';
+import { forceSimulation, forceCollide, forceManyBody, forceX, forceY } from 'd3-force';
 import type { Node, Edge } from '@xyflow/react';
 import type { LayoutStrategy } from './altitudeTypes';
+import { MACRO_SECTORS, computeClusterAnchor } from './macroSectors';
 
 // ---------------------------------------------------------------------------
 // Default node dimensions per layout strategy
@@ -54,6 +55,9 @@ interface ForceNode {
   x: number;
   y: number;
   radius: number;
+  targetX: number;
+  targetY: number;
+  sectorCode: string;
   index?: number;
   vx?: number;
   vy?: number;
@@ -64,43 +68,76 @@ interface ForceNode {
 function applyForceLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
   const dim = DIMENSIONS.force;
 
-  // Create force nodes with bubble size from data
+  // Compute ring radius based on node count — more nodes = wider ring
+  const ringRadius = 300 + Math.sqrt(nodes.length) * 30;
+
+  // Pre-compute anchor positions for each macro-sector
+  const anchorMap = new Map<string, { x: number; y: number; gravity: number }>();
+  for (const ms of MACRO_SECTORS) {
+    const anchor = computeClusterAnchor(ms, ringRadius);
+    for (const code of ms.sectorCodes) {
+      anchorMap.set(code, { ...anchor, gravity: ms.gravityStrength });
+    }
+  }
+
+  // Create force nodes positioned near their macro-sector anchor
   const forceNodes: ForceNode[] = nodes.map((n, i) => {
-    const bubbleSize = ((n.data as Record<string, unknown>).bubbleSize as number) ?? 120;
+    const data = n.data as Record<string, unknown>;
+    const bubbleSize = (data.bubbleSize as number) ?? 120;
+    const sector = (data.sector as string) ?? '';
+    const anchor = anchorMap.get(sector) ?? { x: 0, y: 0, gravity: 0.04 };
+
+    // Initial position near cluster anchor with organic jitter
+    const jitterAngle = (i / Math.max(nodes.length, 1)) * Math.PI * 2 + i * 0.618;
+    const jitterRadius = 40 + Math.random() * 60;
+
     return {
       id: n.id,
-      x: Math.cos((i / nodes.length) * Math.PI * 2) * 200,
-      y: Math.sin((i / nodes.length) * Math.PI * 2) * 200,
+      x: anchor.x + Math.cos(jitterAngle) * jitterRadius,
+      y: anchor.y + Math.sin(jitterAngle) * jitterRadius,
       radius: bubbleSize / 2,
+      targetX: anchor.x,
+      targetY: anchor.y,
+      sectorCode: sector,
     };
   });
 
-  // Create force links
-  const forceLinks = edges.map((e) => ({
-    source: e.source,
-    target: e.target,
-  }));
-
   const simulation = forceSimulation<ForceNode>(forceNodes)
-    .force('center', forceCenter(0, 0))
+    // Cluster gravity: pull each node toward its macro-sector anchor
+    .force(
+      'x',
+      forceX<ForceNode>()
+        .x((d) => d.targetX)
+        .strength((d) => anchorMap.get(d.sectorCode)?.gravity ?? 0.04),
+    )
+    .force(
+      'y',
+      forceY<ForceNode>()
+        .y((d) => d.targetY)
+        .strength((d) => anchorMap.get(d.sectorCode)?.gravity ?? 0.04),
+    )
+    // Collision: prevent overlap within and between clusters
     .force(
       'collision',
-      forceCollide<ForceNode>().radius((d) => d.radius + 15),
+      forceCollide<ForceNode>()
+        .radius((d) => d.radius + 12)
+        .strength(0.8),
     )
-    .force('charge', forceManyBody<ForceNode>().strength(-200))
-    .force(
-      'link',
-      forceLink(forceLinks)
-        .id((d) => (d as ForceNode).id)
-        .distance(200),
-    )
+    // Charge: weaker repulsion since forceX/Y handles positioning
+    .force('charge', forceManyBody<ForceNode>().strength(-80))
     .stop();
 
-  // Run simulation synchronously
-  for (let i = 0; i < 150; i++) simulation.tick();
+  // Run simulation synchronously — more ticks for multi-force convergence
+  for (let i = 0; i < 200; i++) simulation.tick();
+
+  // O(1) lookup instead of .find()
+  const forceNodeMap = new Map<string, ForceNode>();
+  for (const fn of forceNodes) {
+    forceNodeMap.set(fn.id, fn);
+  }
 
   const layoutedNodes = nodes.map((node) => {
-    const forceNode = forceNodes.find((fn) => fn.id === node.id);
+    const forceNode = forceNodeMap.get(node.id);
     if (!forceNode) return node;
     return {
       ...node,

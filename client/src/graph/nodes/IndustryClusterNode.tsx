@@ -1,30 +1,39 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { scoreToColor } from '../utils/performanceUtils';
 
 /**
  * Circular bubble node for GLOBAL altitude.
- * Size ∝ use case count, color = risk gradient, ring = cert health.
+ * Size ∝ weighting mode, fill = risk gradient, ring = cert health gradient,
+ * ring thickness ∝ cert%, volatility pulse ∝ volatilityScore.
  */
 function IndustryClusterNodeInner({ data }: NodeProps) {
   const d = data as Record<string, unknown>;
   const title = (d.title as string) ?? '';
   const code = (d.code as string) ?? '';
   const useCaseCount = (d.useCaseCount as number) ?? 0;
+  const stackCount = (d.stackCount as number) ?? 0;
   const agentCount = (d.agentCount as number) ?? 0;
   const metrics = d.metrics as
     | {
         certHealthPercent: number;
         riskIndex: number;
         coveragePercent: number;
+        volatilityScore: number;
       }
     | undefined;
   const bubbleSize = (d.bubbleSize as number) ?? 120;
   const riskColor = (d.riskColor as string) ?? '#3b82f6';
+  const certRingColor = (d.certRingColor as string) ?? riskColor;
   const certHealth = metrics?.certHealthPercent ?? 0;
+  const volatilityScore = (d.volatilityScore as number) ?? metrics?.volatilityScore ?? 0;
+  const opacity = (d.opacity as number) ?? 1;
+  const macroSectorLabel = (d.macroSectorLabel as string) ?? '';
 
-  // SVG ring for cert health
+  const [hovered, setHovered] = useState(false);
+
+  // SVG ring for cert health — variable thickness based on cert%
+  const certStrokeWidth = 2 + (certHealth / 100) * 4; // 2-6px
   const radius = bubbleSize / 2 - 6;
   const circumference = 2 * Math.PI * radius;
   const certArc = (certHealth / 100) * circumference;
@@ -33,12 +42,21 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
     typeof window !== 'undefined' &&
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-  const isHighRisk = (metrics?.riskIndex ?? 0) > 70;
+  // Volatility pulse: threshold 30, speed scales with score
+  const hasVolatilityPulse = volatilityScore > 30 && !prefersReducedMotion;
+  const pulseDuration = hasVolatilityPulse ? `${Math.max(1, 4 - volatilityScore / 30)}s` : '2s';
 
   return (
     <div
       className="relative flex items-center justify-center cursor-pointer group"
-      style={{ width: bubbleSize, height: bubbleSize }}
+      style={{
+        width: bubbleSize,
+        height: bubbleSize,
+        opacity,
+        transition: 'opacity 200ms ease',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       <svg
         width={bubbleSize}
@@ -55,7 +73,7 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           opacity={0.08}
         />
 
-        {/* Inner glow */}
+        {/* Inner glow — volatility pulse */}
         <circle
           cx={bubbleSize / 2}
           cy={bubbleSize / 2}
@@ -63,17 +81,17 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           fill={riskColor}
           opacity={0.12}
         >
-          {!prefersReducedMotion && isHighRisk && (
+          {hasVolatilityPulse && (
             <animate
               attributeName="opacity"
-              values="0.08;0.18;0.08"
-              dur="2s"
+              values="0.06;0.22;0.06"
+              dur={pulseDuration}
               repeatCount="indefinite"
             />
           )}
         </circle>
 
-        {/* Cert health ring */}
+        {/* Cert health ring — background track */}
         <circle
           cx={bubbleSize / 2}
           cy={bubbleSize / 2}
@@ -83,13 +101,15 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           strokeWidth={1}
           opacity={0.15}
         />
+
+        {/* Cert health ring — active arc with variable thickness */}
         <circle
           cx={bubbleSize / 2}
           cy={bubbleSize / 2}
           r={radius}
           fill="none"
-          stroke={scoreToColor(certHealth)}
-          strokeWidth={3}
+          stroke={certRingColor}
+          strokeWidth={certStrokeWidth}
           strokeDasharray={`${certArc} ${circumference}`}
           strokeLinecap="round"
           transform={`rotate(-90 ${bubbleSize / 2} ${bubbleSize / 2})`}
@@ -103,11 +123,46 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           {title}
         </div>
         <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{code}</div>
+        {macroSectorLabel && (
+          <div className="text-[8px] text-[var(--text-muted)]/60 mt-0.5">{macroSectorLabel}</div>
+        )}
         <div className="flex items-center justify-center gap-2 mt-1">
           <span className="text-[9px] text-blue-400">{useCaseCount} UC</span>
           <span className="text-[9px] text-cyan-400">{agentCount} Agents</span>
         </div>
       </div>
+
+      {/* Hover mini-panel */}
+      {hovered && (
+        <div
+          className="absolute z-50 pointer-events-none"
+          style={{ top: bubbleSize + 4, left: '50%', transform: 'translateX(-50%)' }}
+        >
+          <div className="bg-[var(--surface-primary)]/95 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2 shadow-xl min-w-[140px]">
+            <div className="text-[10px] text-[var(--text-primary)] font-semibold mb-1 truncate">
+              {title}
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px]">
+              <span className="text-[var(--text-muted)]">Use Cases</span>
+              <span className="text-[var(--text-primary)] text-right">{useCaseCount}</span>
+              <span className="text-[var(--text-muted)]">Stacks</span>
+              <span className="text-[var(--text-primary)] text-right">{stackCount}</span>
+              <span className="text-[var(--text-muted)]">Risk</span>
+              <span className="text-right" style={{ color: riskColor }}>
+                {metrics?.riskIndex ?? 0}
+              </span>
+              <span className="text-[var(--text-muted)]">Coverage</span>
+              <span className="text-[var(--text-primary)] text-right">
+                {metrics?.coveragePercent ?? 0}%
+              </span>
+              <span className="text-[var(--text-muted)]">Cert %</span>
+              <span className="text-right" style={{ color: certRingColor }}>
+                {certHealth}%
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hover glow */}
       <div
