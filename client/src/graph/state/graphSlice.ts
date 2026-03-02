@@ -12,6 +12,7 @@ import type { OntologyRelationship } from '../../types/compliance';
 import type { AltitudeLevel, AltitudeContext } from '../altitude/altitudeTypes';
 import { AltitudeController } from '../altitude/AltitudeController';
 import type { WeightingMode } from '../altitude/weightingModes';
+import type { MacroSectorId } from '../altitude/macroSectors';
 
 // ---------------------------------------------------------------------------
 // Ontology thunk (fetches relationships for graph edges)
@@ -25,6 +26,9 @@ interface GraphSliceState extends GraphUIState {
   ontology: OntologyState;
   weightingMode: WeightingMode;
   heatmapEnabled: boolean;
+  hoveredMacroSectorId: MacroSectorId | null;
+  hiddenSectorIds: MacroSectorId[];
+  activeMetricPanel: string | null;
 }
 
 const initialState: GraphSliceState = {
@@ -32,6 +36,9 @@ const initialState: GraphSliceState = {
   ontology: { relationships: [] },
   weightingMode: 'coverage',
   heatmapEnabled: false,
+  hoveredMacroSectorId: null,
+  hiddenSectorIds: [],
+  activeMetricPanel: null,
 };
 
 export const fetchOntologyRelationships = createAsyncThunk(
@@ -254,6 +261,29 @@ const graphSlice = createSlice({
       state.heatmapEnabled = !state.heatmapEnabled;
     },
 
+    // -- Macro-sector hover / filter --
+    setHoveredMacroSector(state, action: PayloadAction<MacroSectorId | null>) {
+      state.hoveredMacroSectorId = action.payload;
+    },
+
+    toggleSectorVisibility(state, action: PayloadAction<MacroSectorId>) {
+      const idx = state.hiddenSectorIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.hiddenSectorIds.splice(idx, 1);
+      } else {
+        state.hiddenSectorIds.push(action.payload);
+      }
+    },
+
+    showAllSectors(state) {
+      state.hiddenSectorIds = [];
+    },
+
+    // -- Metric detail panel --
+    setActiveMetricPanel(state, action: PayloadAction<string | null>) {
+      state.activeMetricPanel = action.payload;
+    },
+
     // -- Simulation --
     enterSimulation(state) {
       state.simulationMode = true;
@@ -313,6 +343,10 @@ export const {
   setAltitudeAnimating,
   setWeightingMode,
   toggleHeatmap,
+  setHoveredMacroSector,
+  toggleSectorVisibility,
+  showAllSectors,
+  setActiveMetricPanel,
   enterSimulation,
   exitSimulation,
   addSimulationModification,

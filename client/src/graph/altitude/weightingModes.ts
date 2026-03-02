@@ -51,6 +51,19 @@ export const WEIGHTING_CONFIGS: Record<WeightingMode, WeightingConfig> = {
   },
 };
 
+/** Tooltip descriptions for each weighting mode */
+export const WEIGHTING_TOOLTIPS: Record<WeightingMode, string> = {
+  coverage:
+    'Bubble size reflects combined use-case and stack deployment count. Larger = broader AI coverage across the industry.',
+  risk: 'Bubble size reflects the aggregate risk index. Larger = higher cumulative risk concentration requiring attention.',
+  revenue:
+    'Bubble size reflects marketplace agent count — a proxy for revenue potential. Larger = more monetization activity.',
+  volatility:
+    'Bubble size reflects certification drift and change velocity. Larger = faster-changing compliance landscape.',
+  certification:
+    'Bubble size reflects certified agent density. Larger = stronger governance and certification maturity.',
+};
+
 /** Compute bubble size for a cluster given the current weighting mode. */
 export function computeBubbleSize(cluster: IndustryClusterAgg, mode: WeightingMode): number {
   return WEIGHTING_CONFIGS[mode].compute(cluster);

@@ -1,11 +1,16 @@
 import { memo, useState } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
+import { useAppSelector } from '../../store/hooks';
+import type { MacroSectorId } from '../altitude/macroSectors';
 
 /**
  * Circular bubble node for GLOBAL altitude.
  * Size ∝ weighting mode, fill = risk gradient, ring = cert health gradient,
  * ring thickness ∝ cert%, volatility pulse ∝ volatilityScore.
+ *
+ * Opacity is computed at render time from Redux hoveredMacroSectorId —
+ * this prevents hover from triggering layout re-simulation.
  */
 function IndustryClusterNodeInner({ data }: NodeProps) {
   const d = data as Record<string, unknown>;
@@ -20,6 +25,7 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
         riskIndex: number;
         coveragePercent: number;
         volatilityScore: number;
+        certifiedCount?: number;
       }
     | undefined;
   const bubbleSize = (d.bubbleSize as number) ?? 120;
@@ -27,8 +33,18 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
   const certRingColor = (d.certRingColor as string) ?? riskColor;
   const certHealth = metrics?.certHealthPercent ?? 0;
   const volatilityScore = (d.volatilityScore as number) ?? metrics?.volatilityScore ?? 0;
-  const opacity = (d.opacity as number) ?? 1;
+  const macroSectorId = (d.macroSectorId as MacroSectorId) ?? 'other';
   const macroSectorLabel = (d.macroSectorLabel as string) ?? '';
+
+  // Render-time opacity from Redux — no data recomputation on hover
+  const hoveredMacroSectorId =
+    useAppSelector(
+      (s) =>
+        (s.graph as unknown as { hoveredMacroSectorId?: MacroSectorId | null })
+          .hoveredMacroSectorId,
+    ) ?? null;
+
+  const opacity = hoveredMacroSectorId && macroSectorId !== hoveredMacroSectorId ? 0.3 : 1;
 
   const [hovered, setHovered] = useState(false);
 
@@ -46,14 +62,20 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
   const hasVolatilityPulse = volatilityScore > 30 && !prefersReducedMotion;
   const pulseDuration = hasVolatilityPulse ? `${Math.max(1, 4 - volatilityScore / 30)}s` : '2s';
 
+  // Depth layering: larger bubbles slightly more opaque
+  const baseOpacity = 0.8 + (bubbleSize / 220) * 0.2;
+
   return (
     <div
       className="relative flex items-center justify-center cursor-pointer group"
       style={{
         width: bubbleSize,
         height: bubbleSize,
-        opacity,
-        transition: 'opacity 200ms ease',
+        opacity: opacity * baseOpacity,
+        transform: hovered ? 'scale(1.05)' : 'scale(1)',
+        filter: hovered ? `drop-shadow(0 4px 16px ${riskColor}40)` : 'none',
+        transition:
+          'opacity 200ms ease, transform 200ms ease, filter 200ms ease, width 400ms ease, height 400ms ease',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -138,7 +160,7 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           className="absolute z-50 pointer-events-none"
           style={{ top: bubbleSize + 4, left: '50%', transform: 'translateX(-50%)' }}
         >
-          <div className="bg-[var(--surface-primary)]/95 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2 shadow-xl min-w-[140px]">
+          <div className="bg-[var(--surface-primary)]/95 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2 shadow-xl min-w-[150px]">
             <div className="text-[10px] text-[var(--text-primary)] font-semibold mb-1 truncate">
               {title}
             </div>
@@ -159,6 +181,10 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
               <span className="text-right" style={{ color: certRingColor }}>
                 {certHealth}%
               </span>
+              <span className="text-[var(--text-muted)]">Volatility</span>
+              <span className="text-[var(--text-primary)] text-right">{volatilityScore}</span>
+              <span className="text-[var(--text-muted)]">Revenue</span>
+              <span className="text-[var(--text-primary)] text-right">{agentCount} agents</span>
             </div>
           </div>
         </div>
@@ -187,4 +213,20 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
   );
 }
 
-export const IndustryClusterNode = memo(IndustryClusterNodeInner);
+// Custom memo: only re-render when visual-affecting data changes
+export const IndustryClusterNode = memo(IndustryClusterNodeInner, (prev, next) => {
+  const p = prev.data as Record<string, unknown>;
+  const n = next.data as Record<string, unknown>;
+  return (
+    p.bubbleSize === n.bubbleSize &&
+    p.riskColor === n.riskColor &&
+    p.certRingColor === n.certRingColor &&
+    p.volatilityScore === n.volatilityScore &&
+    p.macroSectorId === n.macroSectorId &&
+    p.title === n.title &&
+    p.code === n.code &&
+    p.useCaseCount === n.useCaseCount &&
+    p.stackCount === n.stackCount &&
+    p.agentCount === n.agentCount
+  );
+});

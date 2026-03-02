@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { setActiveMetricPanel } from '../state/graphSlice';
 
 interface MetricDef {
+  id: string;
   label: string;
   value: number;
   suffix?: string;
@@ -46,54 +48,111 @@ function useAnimatedCount(target: number, duration = 600): number {
   return display;
 }
 
-function AnimatedMetric({ label, value, suffix, color }: MetricDef) {
+function AnimatedMetric({
+  id,
+  label,
+  value,
+  suffix,
+  color,
+  onClick,
+}: MetricDef & { onClick: (id: string) => void }) {
   const animatedValue = useAnimatedCount(value);
 
   return (
-    <div className="flex flex-col items-center px-3">
+    <button
+      onClick={() => onClick(id)}
+      className="flex flex-col items-center px-3 py-0.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+    >
       <div className="text-lg font-bold" style={{ color }}>
         {animatedValue}
         {suffix ?? ''}
       </div>
       <div className="text-[9px] text-[var(--text-muted)] whitespace-nowrap">{label}</div>
-    </div>
+    </button>
   );
 }
 
 export function GlobalMetricsStrip() {
-  const { industries, useCases, skeletons, variants } = useAppSelector((s) => s.registry);
-  const { marketplace } = useAppSelector((s) => s.orchestrator);
+  const dispatch = useAppDispatch();
+  const { industries, useCases, variants, intelligence } = useAppSelector((s) => s.registry);
+  const { marketplace, dashboard } = useAppSelector((s) => s.orchestrator);
   const { riskAnalysis } = useAppSelector((s) => s.compliance);
 
-  const totalIndustries = industries.length;
-  const totalUseCases = useCases.length;
-  const totalStacks = skeletons.length;
+  // 1. System Health: average intelligence score
+  const systemHealth =
+    intelligence && intelligence.length > 0
+      ? Math.round(intelligence.reduce((s, i) => s + (i.score ?? 0), 0) / intelligence.length)
+      : 0;
 
-  const certifiedCount = variants.filter((v) => v.certificationStatus === 'certified').length;
-  const certPercent =
-    variants.length > 0 ? Math.round((certifiedCount / variants.length) * 100) : 0;
-
-  const avgRisk =
+  // 2. Risk Concentration: weighted avg of high/critical risks
+  const riskConcentration =
     riskAnalysis && riskAnalysis.length > 0
       ? Math.round(riskAnalysis.reduce((s, r) => s + r.riskScore, 0) / riskAnalysis.length)
       : 0;
 
-  const marketplaceCount = marketplace?.length ?? 0;
+  // 3. Coverage Gap: industries without deployments (approximated by use case coverage)
+  const industriesWithUC = new Set(useCases.flatMap((uc) => uc.industryScope ?? []));
+  const coverageGap =
+    industries.length > 0
+      ? Math.round(((industries.length - industriesWithUC.size) / industries.length) * 100)
+      : 0;
+
+  // 4. Cert Strength: certified variants / total variants
+  const certifiedCount = variants.filter((v) => v.certificationStatus === 'certified').length;
+  const certStrength =
+    variants.length > 0 ? Math.round((certifiedCount / variants.length) * 100) : 0;
+
+  // 5. Marketplace Readiness: approved+published / total marketplace
+  const marketplaceArr = marketplace ?? [];
+  const readyCount = marketplaceArr.filter(
+    (m) => m.status === 'approved' || m.status === 'published',
+  ).length;
+  const marketplaceReadiness =
+    marketplaceArr.length > 0 ? Math.round((readyCount / marketplaceArr.length) * 100) : 0;
+
+  // 6. Active Agent Impact: count of deployed variants
+  const activeAgentCount = variants.filter((v) => v.deployments && v.deployments.length > 0).length;
+
+  // 7. Autonomy Confidence: from orchestrator dashboard
+  const autonomyConfidence = dashboard ? Math.round((dashboard.systemConfidence ?? 0) * 100) : 0;
 
   const metrics: MetricDef[] = [
-    { label: 'Industries', value: totalIndustries, color: '#3b82f6' },
-    { label: 'Use Cases', value: totalUseCases, color: '#f59e0b' },
-    { label: 'Stacks', value: totalStacks, color: '#a855f7' },
-    { label: 'Certified', value: certPercent, suffix: '%', color: '#10b981' },
-    { label: 'Risk Index', value: avgRisk, color: '#ef4444' },
-    { label: 'Marketplace', value: marketplaceCount, color: '#ec4899' },
+    { id: 'systemHealth', label: 'System Health', value: systemHealth, color: '#3b82f6' },
+    { id: 'riskConcentration', label: 'Risk Conc.', value: riskConcentration, color: '#ef4444' },
+    { id: 'coverageGap', label: 'Coverage Gap', value: coverageGap, suffix: '%', color: '#f59e0b' },
+    {
+      id: 'certStrength',
+      label: 'Cert Strength',
+      value: certStrength,
+      suffix: '%',
+      color: '#10b981',
+    },
+    {
+      id: 'marketplaceReadiness',
+      label: 'Mkt Ready',
+      value: marketplaceReadiness,
+      suffix: '%',
+      color: '#ec4899',
+    },
+    { id: 'activeAgentImpact', label: 'Active Agents', value: activeAgentCount, color: '#a855f7' },
+    {
+      id: 'autonomyConfidence',
+      label: 'Autonomy',
+      value: autonomyConfidence,
+      suffix: '%',
+      color: '#6366f1',
+    },
   ];
+
+  const handleMetricClick = (metricId: string) => {
+    dispatch(setActiveMetricPanel(metricId));
+  };
 
   return (
     <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30">
-      <div className="flex items-center gap-1 px-4 py-2 rounded-xl bg-[var(--surface-primary)]/80 backdrop-blur-md border border-white/5 shadow-lg">
+      <div className="flex items-center gap-0.5 px-3 py-1.5 rounded-xl bg-[var(--surface-primary)]/80 backdrop-blur-md border border-white/5 shadow-lg">
         {metrics.map((m) => (
-          <AnimatedMetric key={m.label} {...m} />
+          <AnimatedMetric key={m.id} {...m} onClick={handleMetricClick} />
         ))}
       </div>
     </div>

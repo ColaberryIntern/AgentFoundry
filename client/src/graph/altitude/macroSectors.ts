@@ -169,3 +169,69 @@ export function computeClusterAnchor(
     y: Math.sin(sector.anchorAngle) * ringRadius + sector.jitter.y,
   };
 }
+
+/**
+ * Compute sector prominence scores from cluster aggregates.
+ * Groups clusters by macroSectorId, aggregates by weighting mode metric.
+ * Returns sorted descending — highest score = most prominent sector.
+ */
+export function computeSectorProminence(
+  clusters: Array<{
+    sector: string;
+    useCaseCount: number;
+    stackCount: number;
+    agentCount: number;
+    metrics: {
+      riskIndex: number;
+      volatilityScore: number;
+      certHealthPercent: number;
+    };
+  }>,
+  mode: 'coverage' | 'risk' | 'revenue' | 'volatility' | 'certification',
+): Array<{ sectorId: MacroSectorId; score: number }> {
+  const sectorScores = new Map<MacroSectorId, { total: number; count: number }>();
+
+  for (const c of clusters) {
+    const ms = getMacroSector(c.sector);
+    const existing = sectorScores.get(ms.id) ?? { total: 0, count: 0 };
+
+    let value: number;
+    switch (mode) {
+      case 'coverage':
+        value = c.useCaseCount + c.stackCount;
+        break;
+      case 'risk':
+        value = c.metrics.riskIndex;
+        break;
+      case 'revenue':
+        value = c.agentCount;
+        break;
+      case 'volatility':
+        value = c.metrics.volatilityScore;
+        break;
+      case 'certification':
+        value = c.metrics.certHealthPercent;
+        break;
+      default:
+        value = c.useCaseCount;
+    }
+
+    existing.total += value;
+    existing.count += 1;
+    sectorScores.set(ms.id, existing);
+  }
+
+  const result: Array<{ sectorId: MacroSectorId; score: number }> = [];
+  for (const [sectorId, { total, count }] of sectorScores) {
+    // For risk/volatility/certification use average, for coverage/revenue use sum
+    const score =
+      mode === 'risk' || mode === 'volatility' || mode === 'certification'
+        ? count > 0
+          ? total / count
+          : 0
+        : total;
+    result.push({ sectorId, score });
+  }
+
+  return result.sort((a, b) => b.score - a.score);
+}

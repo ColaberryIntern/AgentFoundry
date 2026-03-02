@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -6,6 +6,7 @@ import {
   Background,
   BackgroundVariant,
   ReactFlowProvider,
+  useReactFlow,
   type NodeMouseHandler,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -21,9 +22,12 @@ import {
   hideContextMenu,
   setWeightingMode,
   toggleHeatmap,
+  setHoveredMacroSector,
 } from '../state/graphSlice';
 import type { WeightingMode } from '../altitude/weightingModes';
-import { WEIGHTING_CONFIGS } from '../altitude/weightingModes';
+import { WEIGHTING_CONFIGS, WEIGHTING_TOOLTIPS } from '../altitude/weightingModes';
+import { getMacroSector } from '../altitude/macroSectors';
+import type { MacroSectorId } from '../altitude/macroSectors';
 
 // Custom node imports (detail nodes)
 import { IndustryNode } from '../nodes/IndustryNode';
@@ -52,6 +56,11 @@ import { SimulationBanner } from '../simulation/SimulationBanner';
 import { SystemHealthOrb } from '../widgets/SystemHealthOrb';
 import { GlobalMetricsStrip } from '../widgets/GlobalMetricsStrip';
 import { HeatmapOverlay } from '../overlays/HeatmapOverlay';
+import { SectorBoundaryOverlay } from '../overlays/SectorBoundaryOverlay';
+import { SectorBadgeOverlay } from '../overlays/SectorBadgeOverlay';
+import { SectorFilterBar } from '../widgets/SectorFilterBar';
+import { MetricDetailPanel } from '../panels/MetricDetailPanel';
+import { AgentBrainOrb } from '../widgets/AgentBrainOrb';
 import { AltitudeBreadcrumb } from '../altitude/AltitudeBreadcrumb';
 import { AltitudeIndicator } from '../altitude/AltitudeIndicator';
 import { ALTITUDE_LABELS } from '../altitude/altitudeTypes';
@@ -103,28 +112,36 @@ function WeightingModeToggle({
   onSelect: (mode: WeightingMode) => void;
 }) {
   const modes = Object.values(WEIGHTING_CONFIGS);
+  const currentConfig = WEIGHTING_CONFIGS[current];
   return (
-    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-primary)]/80 backdrop-blur-md border border-white/5">
-      {modes.map((m) => (
-        <button
-          key={m.id}
-          onClick={() => onSelect(m.id)}
-          title={m.description}
-          className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
-            current === m.id
-              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-              : 'text-[var(--text-muted)] hover:bg-white/5 border border-transparent'
-          }`}
-        >
-          {m.label}
-        </button>
-      ))}
+    <div className="flex flex-col gap-1">
+      <div className="text-[9px] text-[var(--text-muted)] font-medium px-1">
+        Global Weighting Mode
+      </div>
+      <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[var(--surface-primary)]/80 backdrop-blur-md border border-white/5">
+        {modes.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => onSelect(m.id)}
+            title={WEIGHTING_TOOLTIPS[m.id]}
+            className={`px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
+              current === m.id
+                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                : 'text-[var(--text-muted)] hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <div className="text-[8px] text-[var(--text-muted)]/70 px-1">{currentConfig.description}</div>
     </div>
   );
 }
 
 function GraphEngineInner() {
   const dispatch = useAppDispatch();
+  const reactFlowInstance = useReactFlow();
   const altitudeCtrl = useAltitudeController();
   const weightingMode =
     useAppSelector(
@@ -133,6 +150,10 @@ function GraphEngineInner() {
   const heatmapEnabled =
     useAppSelector((s) => (s.graph as unknown as { heatmapEnabled?: boolean }).heatmapEnabled) ??
     false;
+  const hiddenSectorIds =
+    useAppSelector(
+      (s) => (s.graph as unknown as { hiddenSectorIds?: MacroSectorId[] }).hiddenSectorIds,
+    ) ?? [];
 
   // Altitude-scoped data (replaces useGraphData)
   const {
@@ -144,8 +165,64 @@ function GraphEngineInner() {
     altitude,
   } = useAltitudeData();
 
-  // Altitude-aware layout (replaces useGraphLayout)
-  const { nodes, edges } = useAltitudeLayout(rawNodes, rawEdges, layoutStrategy);
+  // Compute center sector: the sector with the most nodes in the current weighting
+  const centerSectorId = useMemo((): MacroSectorId | null => {
+    if (altitude !== 'GLOBAL' || rawNodes.length === 0) return null;
+
+    // Group nodes by macroSectorId and pick the one with highest aggregate bubble size
+    const sectorScores = new Map<MacroSectorId, number>();
+    for (const node of rawNodes) {
+      const data = node.data as Record<string, unknown>;
+      const sectorId = (data.macroSectorId as MacroSectorId) ?? 'other';
+      const bubbleSize = (data.bubbleSize as number) ?? 100;
+      sectorScores.set(sectorId, (sectorScores.get(sectorId) ?? 0) + bubbleSize);
+    }
+
+    let topSector: MacroSectorId = 'other';
+    let topScore = 0;
+    for (const [sid, score] of sectorScores) {
+      if (score > topScore) {
+        topScore = score;
+        topSector = sid;
+      }
+    }
+    return topSector;
+  }, [altitude, rawNodes]);
+
+  // Compute triggerKey — layout only recalculates when this changes
+  const triggerKey = useMemo(
+    () =>
+      `${altitude}:${weightingMode}:${nodeCount}:${centerSectorId ?? ''}:${hiddenSectorIds.join(',')}`,
+    [altitude, weightingMode, nodeCount, centerSectorId, hiddenSectorIds],
+  );
+
+  // Altitude-aware layout with physics freeze
+  const { nodes, edges, anchorMap } = useAltitudeLayout(
+    rawNodes,
+    rawEdges,
+    layoutStrategy,
+    triggerKey,
+    centerSectorId,
+  );
+
+  // Imperative fitView on mount and altitude change only
+  const lastAltitudeRef = useRef(altitude);
+  const initialFitDoneRef = useRef(false);
+
+  useEffect(() => {
+    if (nodes.length === 0) return;
+
+    // Fit on initial render or altitude change
+    if (!initialFitDoneRef.current || altitude !== lastAltitudeRef.current) {
+      // Small delay to ensure nodes are positioned
+      const timer = setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+      }, 50);
+      initialFitDoneRef.current = true;
+      lastAltitudeRef.current = altitude;
+      return () => clearTimeout(timer);
+    }
+  }, [nodes.length, altitude, reactFlowInstance]);
 
   // -- Event Handlers (routed through AltitudeController) --
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -186,12 +263,26 @@ function GraphEngineInner() {
   const onNodeMouseEnter: NodeMouseHandler = useCallback(
     (_event, node) => {
       dispatch(hoverNode(node.id));
+      // Resolve macro-sector for cluster-wide focus effect
+      const data = node.data as Record<string, unknown>;
+      const macroSectorId = data.macroSectorId as MacroSectorId | undefined;
+      if (macroSectorId) {
+        dispatch(setHoveredMacroSector(macroSectorId));
+      } else {
+        // For non-cluster nodes, derive from sector code
+        const sector = data.sector as string | undefined;
+        if (sector) {
+          const ms = getMacroSector(sector);
+          dispatch(setHoveredMacroSector(ms.id));
+        }
+      }
     },
     [dispatch],
   );
 
   const onNodeMouseLeave = useCallback(() => {
     dispatch(hoverNode(null));
+    dispatch(setHoveredMacroSector(null));
   }, [dispatch]);
 
   const onPaneClick = useCallback(() => {
@@ -224,8 +315,6 @@ function GraphEngineInner() {
         onNodeMouseEnter={onNodeMouseEnter}
         onNodeMouseLeave={onNodeMouseLeave}
         onPaneClick={onPaneClick}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
         maxZoom={4}
         proOptions={{ hideAttribution: true }}
@@ -254,6 +343,14 @@ function GraphEngineInner() {
 
       {/* Heatmap overlay (behind nodes, GLOBAL only) */}
       {altitude === 'GLOBAL' && heatmapEnabled && <HeatmapOverlay />}
+
+      {/* Sector boundary + badge overlays (GLOBAL only) */}
+      {altitude === 'GLOBAL' && (
+        <>
+          <SectorBoundaryOverlay anchorMap={anchorMap} centerSectorId={centerSectorId} />
+          <SectorBadgeOverlay anchorMap={anchorMap} />
+        </>
+      )}
 
       {/* Altitude Navigation */}
       <AltitudeBreadcrumb />
@@ -288,14 +385,23 @@ function GraphEngineInner() {
         </div>
       )}
 
+      {/* Sector Filter Panel (GLOBAL only) */}
+      {altitude === 'GLOBAL' && <SectorFilterBar />}
+
       {/* System Health Orb */}
       <SystemHealthOrb />
+
+      {/* Agent Brain Orb (GLOBAL only) */}
+      {altitude === 'GLOBAL' && <AgentBrainOrb />}
 
       {/* Traverse Menu */}
       <TraverseMenu />
 
       {/* Command Console (bottom) */}
       <CommandConsole />
+
+      {/* Metric Detail Panel (GLOBAL only) */}
+      {altitude === 'GLOBAL' && <MetricDetailPanel />}
 
       {/* Stats bar */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-lg bg-[var(--surface-primary)]/60 backdrop-blur-md border border-white/5 text-[10px] text-[var(--text-muted)]">

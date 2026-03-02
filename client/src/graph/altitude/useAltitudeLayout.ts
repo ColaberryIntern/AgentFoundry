@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useRef, useMemo } from 'react';
 import dagre from '@dagrejs/dagre';
 import { forceSimulation, forceCollide, forceManyBody, forceX, forceY } from 'd3-force';
 import type { Node, Edge } from '@xyflow/react';
 import type { LayoutStrategy } from './altitudeTypes';
 import { MACRO_SECTORS, computeClusterAnchor } from './macroSectors';
+import type { MacroSectorId } from './macroSectors';
 
 // ---------------------------------------------------------------------------
 // Default node dimensions per layout strategy
@@ -17,37 +18,95 @@ const DIMENSIONS: Record<LayoutStrategy, { width: number; height: number }> = {
 };
 
 // ---------------------------------------------------------------------------
-// Main Layout Hook
+// Layout result type (includes anchorMap for overlays)
+// ---------------------------------------------------------------------------
+
+export interface AltitudeLayoutResult {
+  nodes: Node[];
+  edges: Edge[];
+  anchorMap: Map<MacroSectorId, { x: number; y: number }>;
+}
+
+// ---------------------------------------------------------------------------
+// Main Layout Hook — useRef-cached, only re-runs when triggerKey changes
 // ---------------------------------------------------------------------------
 
 export function useAltitudeLayout(
   nodes: Node[],
   edges: Edge[],
   strategy: LayoutStrategy,
-): { nodes: Node[]; edges: Edge[] } {
-  return useMemo(() => {
-    if (nodes.length === 0) return { nodes: [], edges };
+  triggerKey: string,
+  centerSectorId?: MacroSectorId | null,
+): AltitudeLayoutResult {
+  const cacheRef = useRef<{ key: string; result: AltitudeLayoutResult }>({
+    key: '',
+    result: { nodes: [], edges: [], anchorMap: new Map() },
+  });
+
+  // Non-force strategies don't need caching since they're deterministic and fast
+  const nonForceResult = useMemo(() => {
+    if (strategy === 'force') return null;
+    if (nodes.length === 0)
+      return { nodes: [], edges, anchorMap: new Map<MacroSectorId, { x: number; y: number }>() };
 
     const nodeIdSet = new Set(nodes.map((n) => n.id));
     const validEdges = edges.filter((e) => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
 
     switch (strategy) {
-      case 'force':
-        return applyForceLayout(nodes, validEdges);
       case 'radial':
-        return applyRadialLayout(nodes, validEdges);
+        return {
+          ...applyRadialLayout(nodes, validEdges),
+          anchorMap: new Map<MacroSectorId, { x: number; y: number }>(),
+        };
       case 'dagre-TB':
-        return applyDagreLayout(nodes, validEdges, 'TB');
+        return {
+          ...applyDagreLayout(nodes, validEdges, 'TB'),
+          anchorMap: new Map<MacroSectorId, { x: number; y: number }>(),
+        };
       case 'dagre-LR':
-        return applyDagreLayout(nodes, validEdges, 'LR');
+        return {
+          ...applyDagreLayout(nodes, validEdges, 'LR'),
+          anchorMap: new Map<MacroSectorId, { x: number; y: number }>(),
+        };
       default:
-        return applyDagreLayout(nodes, validEdges, 'TB');
+        return {
+          ...applyDagreLayout(nodes, validEdges, 'TB'),
+          anchorMap: new Map<MacroSectorId, { x: number; y: number }>(),
+        };
     }
   }, [nodes, edges, strategy]);
+
+  if (nonForceResult) return nonForceResult;
+
+  // Force layout: only recompute when triggerKey changes
+  if (cacheRef.current.key === triggerKey && cacheRef.current.result.nodes.length > 0) {
+    return cacheRef.current.result;
+  }
+
+  if (nodes.length === 0) {
+    const empty: AltitudeLayoutResult = { nodes: [], edges, anchorMap: new Map() };
+    cacheRef.current = { key: triggerKey, result: empty };
+    return empty;
+  }
+
+  const nodeIdSet = new Set(nodes.map((n) => n.id));
+  const validEdges = edges.filter((e) => nodeIdSet.has(e.source) && nodeIdSet.has(e.target));
+
+  const result = applyForceLayout(nodes, validEdges, centerSectorId ?? null);
+  cacheRef.current = { key: triggerKey, result };
+  return result;
 }
 
 // ---------------------------------------------------------------------------
-// Force-directed layout (GLOBAL altitude)
+// Deterministic hash for jitter (replaces Math.random())
+// ---------------------------------------------------------------------------
+
+function deterministicJitter(index: number): number {
+  return 20 + (((index * 31337) % 1000) / 1000) * 40;
+}
+
+// ---------------------------------------------------------------------------
+// Force-directed layout (GLOBAL altitude) — Galaxy Core Model
 // ---------------------------------------------------------------------------
 
 interface ForceNode {
@@ -65,18 +124,36 @@ interface ForceNode {
   fy?: number | null;
 }
 
-function applyForceLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
+function applyForceLayout(
+  nodes: Node[],
+  edges: Edge[],
+  centerSectorId: MacroSectorId | null,
+): AltitudeLayoutResult {
   const dim = DIMENSIONS.force;
 
   // Compute ring radius based on node count — more nodes = wider ring
   const ringRadius = 300 + Math.sqrt(nodes.length) * 30;
 
-  // Pre-compute anchor positions for each macro-sector
-  const anchorMap = new Map<string, { x: number; y: number; gravity: number }>();
+  // Build macro-sector anchor map — Galaxy Core: center sector at {0,0}
+  const sectorAnchorMap = new Map<MacroSectorId, { x: number; y: number }>();
+  const codeAnchorMap = new Map<string, { x: number; y: number; gravity: number }>();
+
   for (const ms of MACRO_SECTORS) {
-    const anchor = computeClusterAnchor(ms, ringRadius);
+    let anchor: { x: number; y: number };
+    let gravity: number;
+
+    if (centerSectorId && ms.id === centerSectorId) {
+      // Galaxy Core: center sector occupies origin with strong gravity
+      anchor = { x: 0, y: 0 };
+      gravity = 0.12;
+    } else {
+      anchor = computeClusterAnchor(ms, ringRadius);
+      gravity = ms.gravityStrength;
+    }
+
+    sectorAnchorMap.set(ms.id, anchor);
     for (const code of ms.sectorCodes) {
-      anchorMap.set(code, { ...anchor, gravity: ms.gravityStrength });
+      codeAnchorMap.set(code, { ...anchor, gravity });
     }
   }
 
@@ -85,11 +162,11 @@ function applyForceLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges:
     const data = n.data as Record<string, unknown>;
     const bubbleSize = (data.bubbleSize as number) ?? 120;
     const sector = (data.sector as string) ?? '';
-    const anchor = anchorMap.get(sector) ?? { x: 0, y: 0, gravity: 0.04 };
+    const anchor = codeAnchorMap.get(sector) ?? { x: 0, y: 0, gravity: 0.04 };
 
-    // Initial position near cluster anchor with organic jitter
+    // Deterministic jitter — same layout for same node set
     const jitterAngle = (i / Math.max(nodes.length, 1)) * Math.PI * 2 + i * 0.618;
-    const jitterRadius = 40 + Math.random() * 60;
+    const jitterRadius = deterministicJitter(i);
 
     return {
       id: n.id,
@@ -108,13 +185,13 @@ function applyForceLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges:
       'x',
       forceX<ForceNode>()
         .x((d) => d.targetX)
-        .strength((d) => anchorMap.get(d.sectorCode)?.gravity ?? 0.04),
+        .strength((d) => codeAnchorMap.get(d.sectorCode)?.gravity ?? 0.04),
     )
     .force(
       'y',
       forceY<ForceNode>()
         .y((d) => d.targetY)
-        .strength((d) => anchorMap.get(d.sectorCode)?.gravity ?? 0.04),
+        .strength((d) => codeAnchorMap.get(d.sectorCode)?.gravity ?? 0.04),
     )
     // Collision: prevent overlap within and between clusters
     .force(
@@ -127,7 +204,7 @@ function applyForceLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges:
     .force('charge', forceManyBody<ForceNode>().strength(-80))
     .stop();
 
-  // Run simulation synchronously — more ticks for multi-force convergence
+  // Run simulation synchronously — 200 ticks for convergence
   for (let i = 0; i < 200; i++) simulation.tick();
 
   // O(1) lookup instead of .find()
@@ -148,7 +225,7 @@ function applyForceLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges:
     };
   });
 
-  return { nodes: layoutedNodes, edges };
+  return { nodes: layoutedNodes, edges, anchorMap: sectorAnchorMap };
 }
 
 // ---------------------------------------------------------------------------

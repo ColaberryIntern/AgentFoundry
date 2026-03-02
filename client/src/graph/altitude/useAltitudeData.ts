@@ -42,7 +42,10 @@ export interface AltitudeDataResult {
 // ---------------------------------------------------------------------------
 
 export function useAltitudeData(): AltitudeDataResult {
-  const { currentAltitude, altitudeContext, hoveredNodeId } = useAppSelector((s) => s.graph);
+  const { currentAltitude, altitudeContext } = useAppSelector((s) => s.graph);
+  const hiddenSectorIds =
+    useAppSelector((s) => (s.graph as unknown as { hiddenSectorIds?: string[] }).hiddenSectorIds) ??
+    [];
   const weightingMode =
     useAppSelector(
       (s) => (s.graph as unknown as { weightingMode?: WeightingMode }).weightingMode,
@@ -83,26 +86,19 @@ export function useAltitudeData(): AltitudeDataResult {
         riskAnalysis ?? [],
       );
 
-      // Determine hovered macro-sector for focus mode
-      let hoveredMacroSector: string | null = null;
-      if (hoveredNodeId && hoveredNodeId.startsWith('indcluster-')) {
-        const hoveredCode = hoveredNodeId.replace('indcluster-', '');
-        const hoveredCluster = clusters.find((c) => c.code === hoveredCode);
-        if (hoveredCluster) {
-          hoveredMacroSector = getMacroSector(hoveredCluster.sector)?.id ?? null;
-        }
-      }
+      // Filter out hidden sectors
+      const visibleClusters =
+        hiddenSectorIds.length > 0
+          ? clusters.filter((c) => {
+              const ms = getMacroSector(c.sector);
+              return !hiddenSectorIds.includes(ms?.id ?? 'other');
+            })
+          : clusters;
 
-      const nodes: Node[] = clusters.map((c) => {
+      const nodes: Node[] = visibleClusters.map((c) => {
         const macroSector = getMacroSector(c.sector);
         const macroSectorId = macroSector?.id ?? 'other';
         const macroSectorLabel = macroSector?.label ?? 'Other';
-
-        // Focus mode: fade non-cluster-mates when hovering
-        let opacity = 1;
-        if (hoveredMacroSector && macroSectorId !== hoveredMacroSector) {
-          opacity = 0.2;
-        }
 
         return {
           id: `indcluster-${c.code}`,
@@ -121,7 +117,7 @@ export function useAltitudeData(): AltitudeDataResult {
             metrics: c.metrics,
             emphasis: 'primary',
             selected: false,
-            opacity,
+            opacity: 1,
             // Semantic sizing and colors
             bubbleSize: computeBubbleSize(c, weightingMode),
             riskColor: riskToGradientColor(c.metrics.riskIndex),
@@ -369,7 +365,7 @@ export function useAltitudeData(): AltitudeDataResult {
     marketplace,
     ontologyRelationships,
     weightingMode,
-    hoveredNodeId,
+    hiddenSectorIds,
   ]);
 
   return {
