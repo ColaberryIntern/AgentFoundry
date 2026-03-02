@@ -219,17 +219,39 @@ export function GlobalMetricsStrip() {
     scopedVariants,
   ]);
 
-  // 1. System Health: average intelligence score (global — not sector-scopeable)
-  const systemHealth =
-    intelligence && intelligence.length > 0
-      ? Math.round(intelligence.reduce((s, i) => s + (i.score ?? 0), 0) / intelligence.length)
-      : 0;
+  // Whether we're at a sub-global altitude (INDUSTRY, USE_CASE, STACK, AGENT)
+  const isSubGlobal = !!(
+    industryCodeFilter ||
+    useCaseIdFilter ||
+    skeletonIdFilter ||
+    variantIdFilter
+  );
 
-  // 2. Risk Concentration: weighted avg of risks (global — not sector-scopeable)
-  const riskConcentration =
-    riskAnalysis && riskAnalysis.length > 0
-      ? Math.round(riskAnalysis.reduce((s, r) => s + r.riskScore, 0) / riskAnalysis.length)
-      : 0;
+  // 1. System Health: at GLOBAL use intelligence scores; deeper = avg cert scores
+  const systemHealth = useMemo(() => {
+    if (!isSubGlobal) {
+      return intelligence && intelligence.length > 0
+        ? Math.round(intelligence.reduce((s, i) => s + (i.score ?? 0), 0) / intelligence.length)
+        : 0;
+    }
+    const scores = scopedVariants.map((v) => v.certificationScore ?? 0).filter((s) => s > 0);
+    return scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  }, [intelligence, isSubGlobal, scopedVariants]);
+
+  // 2. Risk Concentration: at GLOBAL use riskAnalysis; deeper = inverse of avg cert
+  const riskConcentration = useMemo(() => {
+    if (!isSubGlobal) {
+      return riskAnalysis && riskAnalysis.length > 0
+        ? Math.round(riskAnalysis.reduce((s, r) => s + r.riskScore, 0) / riskAnalysis.length)
+        : 0;
+    }
+    const scores = scopedVariants.map((v) => v.certificationScore ?? 0).filter((s) => s > 0);
+    if (scores.length > 0) {
+      const avgCert = scores.reduce((a, b) => a + b, 0) / scores.length;
+      return Math.round(Math.max(0, 100 - avgCert));
+    }
+    return 50; // unknown = moderate
+  }, [riskAnalysis, isSubGlobal, scopedVariants]);
 
   // 3. Coverage Gap: industries without use case coverage
   const industriesWithUC = new Set(scopedUseCases.flatMap((uc) => uc.industryScope ?? []));

@@ -52,7 +52,7 @@ import { SimulationBanner } from '../simulation/SimulationBanner';
 import { SystemHealthOrb } from '../widgets/SystemHealthOrb';
 import { GlobalMetricsStrip } from '../widgets/GlobalMetricsStrip';
 import { SectorBoundaryOverlay } from '../overlays/SectorBoundaryOverlay';
-import { SectorBadgeOverlay } from '../overlays/SectorBadgeOverlay';
+
 import { SectorSelectorBar } from '../widgets/SectorSelectorBar';
 import { MetricDetailPanel } from '../panels/MetricDetailPanel';
 import { AgentBrainOrb } from '../widgets/AgentBrainOrb';
@@ -348,14 +348,11 @@ function GraphEngineInner() {
 
       {/* Sector boundary + badge overlays (GLOBAL only) */}
       {altitude === 'GLOBAL' && (
-        <>
-          <SectorBoundaryOverlay
-            nodes={nodes}
-            anchorMap={anchorMap}
-            centerSectorId={centerSectorId}
-          />
-          <SectorBadgeOverlay anchorMap={anchorMap} nodes={nodes} />
-        </>
+        <SectorBoundaryOverlay
+          nodes={nodes}
+          anchorMap={anchorMap}
+          centerSectorId={centerSectorId}
+        />
       )}
 
       {/* Altitude Navigation */}

@@ -66,6 +66,23 @@ export interface IndustryNodeData extends BaseNodeData {
   useCaseCount: number;
   variantCount: number;
   certifiedCount: number;
+  // Optional KPI metrics for full-bubble rendering at INDUSTRY center
+  metrics?: {
+    certHealthPercent: number;
+    riskIndex: number;
+    coveragePercent: number;
+    volatilityScore: number;
+    activeDeployments: number;
+    errorRate: number;
+    totalCount: number;
+    certifiedCount: number;
+  };
+  riskColor?: string;
+  certRingColor?: string;
+  bubbleSize?: number;
+  volatilityScore?: number;
+  coveragePercent?: number;
+  revenueScore?: number;
 }
 
 export interface UseCaseNodeData extends BaseNodeData {
@@ -76,6 +93,26 @@ export interface UseCaseNodeData extends BaseNodeData {
   regulatoryScope: string[];
   industryScope: string[];
   kpi: string | null;
+  // Optional KPI metrics for full-bubble rendering at USE_CASE center
+  stackCount?: number;
+  agentCount?: number;
+  deploymentCount?: number;
+  metrics?: {
+    certHealthPercent: number;
+    riskIndex: number;
+    coveragePercent: number;
+    volatilityScore: number;
+    activeDeployments: number;
+    errorRate: number;
+    totalCount: number;
+    certifiedCount: number;
+  };
+  riskColor?: string;
+  certRingColor?: string;
+  bubbleSize?: number;
+  volatilityScore?: number;
+  coveragePercent?: number;
+  revenueScore?: number;
 }
 
 export interface SkeletonNodeData extends BaseNodeData {

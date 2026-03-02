@@ -7,6 +7,7 @@ import {
   aggregateIndustryClusters,
   aggregateUseCaseClusters,
   aggregateStackClusters,
+  computeClusterMetrics,
 } from './aggregators';
 import { buildAltitudeEdges } from './altitudeEdgeBuilders';
 import {
@@ -155,12 +156,26 @@ export function useAltitudeData(): AltitudeDataResult {
         (v) => v.certificationStatus === 'certified',
       ).length;
 
-      // Build center industry node
+      // Build center industry node with full KPI metrics
+      const industryMetrics = computeClusterMetrics(industryVariants, riskAnalysis ?? []);
+      const maxAgentsForRevenue = Math.max(industryVariants.length, 1);
       const industryNode = industryToNode(
         industry,
         industryUseCases.length,
         industryVariants.length,
         certifiedCount,
+        'primary',
+        {
+          metrics: industryMetrics,
+          bubbleSize: 200,
+          riskColor: riskToGradientColor(industryMetrics.riskIndex),
+          certRingColor: certToGradientColor(industryMetrics.certHealthPercent),
+          volatilityScore: industryMetrics.volatilityScore,
+          coveragePercent: industryMetrics.coveragePercent,
+          revenueScore: Math.round(
+            Math.min(100, (industryVariants.length / maxAgentsForRevenue) * 100),
+          ),
+        },
       );
 
       // Build use case clusters
@@ -252,8 +267,27 @@ export function useAltitudeData(): AltitudeDataResult {
         effectiveSkeletons.some((sk) => sk.id === v.skeletonId),
       );
 
-      // Build center use case node
-      const ucNode = useCaseToNode(useCase);
+      // Build center use case node with full KPI metrics
+      const ucMetrics = computeClusterMetrics(relevantVariants, []);
+      let ucDeploymentCount = 0;
+      for (const v of relevantVariants) {
+        ucDeploymentCount += v.deployments?.length ?? 0;
+      }
+      const maxVariantsForRevenue = Math.max(relevantVariants.length, 1);
+      const ucNode = useCaseToNode(useCase, 'primary', {
+        stackCount: effectiveSkeletons.length,
+        agentCount: relevantVariants.length,
+        deploymentCount: ucDeploymentCount,
+        metrics: ucMetrics,
+        bubbleSize: 200,
+        riskColor: riskToGradientColor(ucMetrics.riskIndex),
+        certRingColor: certToGradientColor(ucMetrics.certHealthPercent),
+        volatilityScore: ucMetrics.volatilityScore,
+        coveragePercent: ucMetrics.coveragePercent,
+        revenueScore: Math.round(
+          Math.min(100, (relevantVariants.length / maxVariantsForRevenue) * 100),
+        ),
+      });
 
       // Build stack clusters
       const stClusters = aggregateStackClusters(effectiveSkeletons, relevantVariants);

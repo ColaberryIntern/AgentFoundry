@@ -145,7 +145,7 @@ export function aggregateStackClusters(
 // Shared metric computation
 // ---------------------------------------------------------------------------
 
-function computeClusterMetrics(
+export function computeClusterMetrics(
   variants: AgentVariant[],
   risks: RiskAnalysisResult[],
 ): ClusterMetrics {

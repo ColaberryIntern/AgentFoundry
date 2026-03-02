@@ -3,16 +3,19 @@ import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 
 /**
- * Circular bubble node for USE_CASE altitude (stack/skeleton clusters).
+ * Rounded-square bubble node for USE_CASE altitude (stack/skeleton clusters).
  *
- * 7 simultaneous KPI channels (matching IndustryClusterNode):
- *   1. Radius     → variantCount (power curve)
- *   2. Fill tint  → riskIndex (20-35% opacity gradient)
- *   3. Outer ring → certHealthPercent (1-4px arc)
- *   4. Inner arc  → coveragePercent (green arc over gray track)
- *   5. Glow       → revenueScore (outer blur if ≥ 60)
- *   6. Dot        → volatilityScore (gray/amber/red static marker)
- *   7. Text       → skeleton name + variant count
+ * Distinct rounded-square shape differentiates stack clusters from
+ * GLOBAL circles and INDUSTRY hexagons.
+ *
+ * 7 simultaneous KPI channels:
+ *   1. Size      → variantCount (power curve)
+ *   2. Fill tint → riskIndex (20-35% opacity gradient)
+ *   3. Outer ring→ certHealthPercent (1-4px rounded-rect outline)
+ *   4. Inner ring→ coveragePercent (green rounded-rect outline)
+ *   5. Glow      → revenueScore (outer blur if ≥ 60)
+ *   6. Dot       → volatilityScore (gray/amber/red marker)
+ *   7. Text      → skeleton name + variant count
  */
 function StackClusterNodeInner({ data }: NodeProps) {
   const d = data as Record<string, unknown>;
@@ -42,30 +45,39 @@ function StackClusterNodeInner({ data }: NodeProps) {
 
   const [hovered, setHovered] = useState(false);
 
+  // Rounded-square dimensions
+  const padding = 6;
+  const side = bubbleSize - padding * 2;
+  const rx = side * 0.15; // corner radius = 15% of side
+  const x0 = padding;
+  const y0 = padding;
+
   // -- KPI 2: Risk fill tint opacity (20-35%)
   const riskFillOpacity = 0.2 + (riskIndex / 100) * 0.15;
 
-  // -- KPI 3: Cert health ring
+  // -- KPI 3: Cert health ring — rounded rect perimeter
   const certStrokeWidth = 1 + (certHealth / 100) * 3;
-  const radius = bubbleSize / 2 - 6;
-  const circumference = 2 * Math.PI * radius;
-  const certArc = (certHealth / 100) * circumference;
+  const certPerimeter = 2 * (side + side) - 8 * rx + 2 * Math.PI * rx; // approx rounded rect perimeter
+  const certArc = (certHealth / 100) * certPerimeter;
 
-  // -- KPI 4: Coverage gap arc
-  const coverageRadius = radius - certStrokeWidth - 3;
-  const coverageCircum = 2 * Math.PI * coverageRadius;
-  const coverageArc = (coveragePercent / 100) * coverageCircum;
+  // -- KPI 4: Coverage ring
+  const coveragePad = certStrokeWidth + 4;
+  const coverageSide = side - coveragePad * 2;
+  const coverageRx = coverageSide * 0.15;
+  const coveragePerimeter =
+    2 * (coverageSide + coverageSide) - 8 * coverageRx + 2 * Math.PI * coverageRx;
+  const coverageArc = (coveragePercent / 100) * coveragePerimeter;
 
   // -- KPI 5: Revenue glow
   const hasRevenueGlow = revenueScore >= 60;
   const revenueGlowSize = hasRevenueGlow ? 12 + (revenueScore - 60) * 0.3 : 0;
 
-  // -- KPI 6: Volatility dot (always shown)
+  // -- KPI 6: Volatility dot
   const volatilityDotColor =
     volatilityScore > 70 ? '#ef4444' : volatilityScore > 40 ? '#f59e0b' : '#6b7280';
   const volatilityDotR = 3 + (volatilityScore / 100) * 3;
 
-  // Risk badge color classes
+  // Risk badge colors
   const riskColors: Record<string, string> = {
     low: '#10b981',
     medium: '#f59e0b',
@@ -74,6 +86,7 @@ function StackClusterNodeInner({ data }: NodeProps) {
   };
 
   const baseOpacity = 0.8 + (bubbleSize / 220) * 0.2;
+  const borderRadius = `${(rx / side) * 100}%`;
 
   return (
     <div
@@ -85,7 +98,7 @@ function StackClusterNodeInner({ data }: NodeProps) {
         transform: hovered ? 'scale(1.05)' : 'scale(1)',
         filter: hovered ? `drop-shadow(0 4px 16px ${riskColor}40)` : 'none',
         boxShadow: hasRevenueGlow ? `0 0 ${revenueGlowSize}px ${riskColor}30` : 'none',
-        borderRadius: '50%',
+        borderRadius,
         transition:
           'opacity 200ms ease, transform 200ms ease, filter 200ms ease, box-shadow 300ms ease',
       }}
@@ -98,75 +111,91 @@ function StackClusterNodeInner({ data }: NodeProps) {
         viewBox={`0 0 ${bubbleSize} ${bubbleSize}`}
         className="absolute inset-0"
       >
-        {/* KPI 2: Background circle — risk tint */}
-        <circle
-          cx={bubbleSize / 2}
-          cy={bubbleSize / 2}
-          r={radius + 2}
+        {/* KPI 2: Background rounded-square — risk tint */}
+        <rect
+          x={x0 - 2}
+          y={y0 - 2}
+          width={side + 4}
+          height={side + 4}
+          rx={rx}
+          ry={rx}
           fill={riskColor}
           opacity={riskFillOpacity}
         />
         {/* Inner glow */}
-        <circle
-          cx={bubbleSize / 2}
-          cy={bubbleSize / 2}
-          r={radius - 10}
+        <rect
+          x={x0 + 10}
+          y={y0 + 10}
+          width={side - 20}
+          height={side - 20}
+          rx={rx * 0.6}
+          ry={rx * 0.6}
           fill={riskColor}
           opacity={0.08}
         />
 
         {/* KPI 3: Cert health ring — background track */}
-        <circle
-          cx={bubbleSize / 2}
-          cy={bubbleSize / 2}
-          r={radius}
+        <rect
+          x={x0}
+          y={y0}
+          width={side}
+          height={side}
+          rx={rx}
+          ry={rx}
           fill="none"
           stroke={riskColor}
           strokeWidth={1}
           opacity={0.15}
         />
         {/* KPI 3: Cert health ring — active arc */}
-        <circle
-          cx={bubbleSize / 2}
-          cy={bubbleSize / 2}
-          r={radius}
+        <rect
+          x={x0}
+          y={y0}
+          width={side}
+          height={side}
+          rx={rx}
+          ry={rx}
           fill="none"
           stroke={certRingColor}
           strokeWidth={certStrokeWidth}
-          strokeDasharray={`${certArc} ${circumference}`}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${bubbleSize / 2} ${bubbleSize / 2})`}
+          strokeDasharray={`${certArc} ${certPerimeter}`}
+          strokeLinejoin="round"
           opacity={0.8}
         />
 
-        {/* KPI 4: Coverage gap arc — gray track */}
-        <circle
-          cx={bubbleSize / 2}
-          cy={bubbleSize / 2}
-          r={coverageRadius}
+        {/* KPI 4: Coverage ring — gray track */}
+        <rect
+          x={x0 + coveragePad}
+          y={y0 + coveragePad}
+          width={coverageSide}
+          height={coverageSide}
+          rx={coverageRx}
+          ry={coverageRx}
           fill="none"
           stroke="#374151"
           strokeWidth={1.5}
           opacity={0.2}
         />
-        {/* KPI 4: Coverage gap arc — green fill */}
-        <circle
-          cx={bubbleSize / 2}
-          cy={bubbleSize / 2}
-          r={coverageRadius}
+        {/* KPI 4: Coverage ring — green fill */}
+        <rect
+          x={x0 + coveragePad}
+          y={y0 + coveragePad}
+          width={coverageSide}
+          height={coverageSide}
+          rx={coverageRx}
+          ry={coverageRx}
           fill="none"
           stroke="#10b981"
           strokeWidth={1.5}
-          strokeDasharray={`${coverageArc} ${coverageCircum}`}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${bubbleSize / 2} ${bubbleSize / 2})`}
+          strokeDasharray={`${coverageArc} ${coveragePerimeter}`}
+          strokeLinejoin="round"
           opacity={0.7}
         />
 
-        {/* KPI 6: Volatility marker — always shown */}
+        {/* KPI 6: Volatility marker — bottom-right corner */}
         <circle
-          cx={bubbleSize / 2 + radius * 0.6}
-          cy={bubbleSize / 2 + radius * 0.6}
+          cx={x0 + side - 8}
+          cy={y0 + side - 8}
           r={volatilityDotR}
           fill={volatilityDotColor}
           opacity={0.85}
@@ -192,35 +221,35 @@ function StackClusterNodeInner({ data }: NodeProps) {
           className="absolute z-50 pointer-events-none"
           style={{ top: bubbleSize + 4, left: '50%', transform: 'translateX(-50%)' }}
         >
-          <div className="bg-[#0f172a] backdrop-blur-md border border-white/20 rounded-lg px-3 py-2 shadow-2xl shadow-black/50 min-w-[160px] text-white">
+          <div className="bg-[#0f172a] backdrop-blur-md border border-white/20 rounded-lg px-3 py-2 shadow-2xl shadow-black/50 min-w-[220px] text-white">
             <div className="text-[10px] text-[var(--text-primary)] font-semibold mb-1 truncate">
               {label}
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px]">
-              <span className="text-[var(--text-muted)]">Variants</span>
+            <div className="grid grid-cols-[auto_minmax(40px,1fr)] gap-x-4 gap-y-0.5 text-[9px]">
+              <span className="text-[var(--text-muted)] whitespace-nowrap">Variants</span>
               <span className="text-[var(--text-primary)] text-right">{variantCount}</span>
-              <span className="text-[var(--text-muted)]">Active</span>
+              <span className="text-[var(--text-muted)] whitespace-nowrap">Active</span>
               <span className="text-[var(--text-primary)] text-right">{activeDeployments}</span>
-              <span className="text-[var(--text-muted)]">Risk Level</span>
+              <span className="text-[var(--text-muted)] whitespace-nowrap">Risk Level</span>
               <span
                 className="text-right capitalize"
                 style={{ color: riskColors[riskLevel] ?? '#10b981' }}
               >
                 {riskLevel}
               </span>
-              <span className="text-[var(--text-muted)]">Risk Index</span>
+              <span className="text-[var(--text-muted)] whitespace-nowrap">Risk Index</span>
               <span className="text-right" style={{ color: riskColor }}>
                 {riskIndex}
               </span>
-              <span className="text-[var(--text-muted)]">Coverage</span>
+              <span className="text-[var(--text-muted)] whitespace-nowrap">Coverage</span>
               <span className="text-[var(--text-primary)] text-right">{coveragePercent}%</span>
-              <span className="text-[var(--text-muted)]">Cert %</span>
+              <span className="text-[var(--text-muted)] whitespace-nowrap">Cert %</span>
               <span className="text-right" style={{ color: certRingColor }}>
                 {certHealth}%
               </span>
-              <span className="text-[var(--text-muted)]">Volatility</span>
+              <span className="text-[var(--text-muted)] whitespace-nowrap">Volatility</span>
               <span className="text-[var(--text-primary)] text-right">{volatilityScore}</span>
-              <span className="text-[var(--text-muted)]">Revenue</span>
+              <span className="text-[var(--text-muted)] whitespace-nowrap">Revenue</span>
               <span className="text-[var(--text-primary)] text-right">{revenueScore}</span>
             </div>
           </div>
@@ -229,10 +258,10 @@ function StackClusterNodeInner({ data }: NodeProps) {
 
       {/* Hover glow ring */}
       <div
-        className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
         style={{
           boxShadow: `0 0 20px ${riskColor}30, 0 0 40px ${riskColor}10`,
-          borderRadius: '50%',
+          borderRadius,
         }}
       />
 

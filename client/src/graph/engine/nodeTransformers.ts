@@ -32,6 +32,15 @@ export function industryToNode(
   variantCount: number,
   certifiedCount: number,
   emphasis: NodeEmphasis = 'primary',
+  kpiData?: {
+    metrics?: IndustryNodeData['metrics'];
+    riskColor?: string;
+    certRingColor?: string;
+    bubbleSize?: number;
+    volatilityScore?: number;
+    coveragePercent?: number;
+    revenueScore?: number;
+  },
 ): GraphNode {
   const data: IndustryNodeData = {
     nodeType: 'industry',
@@ -48,6 +57,7 @@ export function industryToNode(
     useCaseCount,
     variantCount,
     certifiedCount,
+    ...kpiData,
   };
   return { id: `industry-${ind.code}`, type: 'industryNode', position: { x: 0, y: 0 }, data };
 }
@@ -56,7 +66,22 @@ export function industryToNode(
 // UseCase → GraphNode
 // ---------------------------------------------------------------------------
 
-export function useCaseToNode(uc: UseCase, emphasis: NodeEmphasis = 'primary'): GraphNode {
+export function useCaseToNode(
+  uc: UseCase,
+  emphasis: NodeEmphasis = 'primary',
+  kpiData?: {
+    stackCount?: number;
+    agentCount?: number;
+    deploymentCount?: number;
+    metrics?: UseCaseNodeData['metrics'];
+    riskColor?: string;
+    certRingColor?: string;
+    bubbleSize?: number;
+    volatilityScore?: number;
+    coveragePercent?: number;
+    revenueScore?: number;
+  },
+): GraphNode {
   const data: UseCaseNodeData = {
     nodeType: 'useCase',
     label:
@@ -74,6 +99,7 @@ export function useCaseToNode(uc: UseCase, emphasis: NodeEmphasis = 'primary'): 
     regulatoryScope: uc.regulatoryScope ?? [],
     industryScope: uc.industryScope ?? [],
     kpi: uc.measurableKpi,
+    ...kpiData,
   };
   return { id: `usecase-${uc.id}`, type: 'useCaseNode', position: { x: 0, y: 0 }, data };
 }
