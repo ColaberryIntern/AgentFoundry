@@ -27,6 +27,7 @@ interface GraphSliceState extends GraphUIState {
   weightingMode: WeightingMode;
   heatmapEnabled: boolean;
   hoveredMacroSectorId: MacroSectorId | null;
+  focusedSectorId: MacroSectorId | null;
   hiddenSectorIds: MacroSectorId[];
   activeMetricPanel: string | null;
 }
@@ -37,6 +38,7 @@ const initialState: GraphSliceState = {
   weightingMode: 'coverage',
   heatmapEnabled: false,
   hoveredMacroSectorId: null,
+  focusedSectorId: null,
   hiddenSectorIds: [],
   activeMetricPanel: null,
 };
@@ -204,11 +206,12 @@ const graphSlice = createSlice({
     setAltitude(state, action: PayloadAction<{ level: AltitudeLevel; context: AltitudeContext }>) {
       state.currentAltitude = action.payload.level;
       state.altitudeContext = action.payload.context;
-      // Clear selection on altitude change
+      // Clear selection and focus on altitude change
       state.selectedNodeIds = [];
       state.contextPanelOpen = false;
       state.contextPanelNodeId = null;
       state.contextPanelNodeType = null;
+      state.focusedSectorId = null;
     },
 
     descendAltitude(state, action: PayloadAction<{ targetId: string; targetType: string }>) {
@@ -222,13 +225,14 @@ const graphSlice = createSlice({
         state.currentAltitude = result.level;
         state.altitudeContext = result.context;
         state.altitudeAnimating = true;
-        // Clear selection on descent
+        // Clear selection and focus on descent
         state.selectedNodeIds = [];
         state.contextPanelOpen = false;
         state.contextPanelNodeId = null;
         state.contextPanelNodeType = null;
         state.expandedNodeIds = [];
         state.isolatedSubgraphRoot = null;
+        state.focusedSectorId = null;
       }
     },
 
@@ -238,13 +242,14 @@ const graphSlice = createSlice({
         state.currentAltitude = result.level;
         state.altitudeContext = result.context;
         state.altitudeAnimating = true;
-        // Clear selection on ascent
+        // Clear selection and focus on ascent
         state.selectedNodeIds = [];
         state.contextPanelOpen = false;
         state.contextPanelNodeId = null;
         state.contextPanelNodeType = null;
         state.expandedNodeIds = [];
         state.isolatedSubgraphRoot = null;
+        state.focusedSectorId = null;
       }
     },
 
@@ -277,6 +282,11 @@ const graphSlice = createSlice({
 
     showAllSectors(state) {
       state.hiddenSectorIds = [];
+    },
+
+    // -- Sector focus --
+    setFocusedSector(state, action: PayloadAction<MacroSectorId | null>) {
+      state.focusedSectorId = action.payload;
     },
 
     // -- Metric detail panel --
@@ -344,6 +354,7 @@ export const {
   setWeightingMode,
   toggleHeatmap,
   setHoveredMacroSector,
+  setFocusedSector,
   toggleSectorVisibility,
   showAllSectors,
   setActiveMetricPanel,

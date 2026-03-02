@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { useViewport } from '@xyflow/react';
-import { useAppSelector } from '../../store/hooks';
-import { MACRO_SECTORS, getMacroSector, computeClusterAnchor } from '../altitude/macroSectors';
+import type { Node } from '@xyflow/react';
+import { MACRO_SECTORS } from '../altitude/macroSectors';
 import type { MacroSectorId } from '../altitude/macroSectors';
+import { computeBoundingBox } from '../utils/hullGeometry';
 
 interface SectorBadge {
   id: MacroSectorId;
@@ -14,53 +15,66 @@ interface SectorBadge {
   color: string;
 }
 
+const NODE_HALF = 80;
+
 /**
  * Per-sector summary badge overlay. Displays glassmorphic pills below each
- * sector label with key aggregate metrics. Pointer-events: none.
+ * sector cluster with per-sector aggregate metrics computed from node data.
  */
 export function SectorBadgeOverlay({
-  anchorMap,
+  nodes,
 }: {
   anchorMap: Map<MacroSectorId, { x: number; y: number }>;
+  nodes: Node[];
 }) {
   const viewport = useViewport();
-  const { industries, variants } = useAppSelector((s) => s.registry);
-  const { riskAnalysis } = useAppSelector((s) => s.compliance);
-
-  const nodeCount = industries.length;
-  const ringRadius = 300 + Math.sqrt(nodeCount) * 30;
 
   const badges = useMemo((): SectorBadge[] => {
-    // Group industries by macro sector
-    const sectorIndustries = new Map<MacroSectorId, number>();
-    for (const ind of industries) {
-      const ms = getMacroSector(ind.sector);
-      sectorIndustries.set(ms.id, (sectorIndustries.get(ms.id) ?? 0) + 1);
+    // Group nodes by macroSectorId and compute per-sector metrics
+    const sectorData = new Map<
+      MacroSectorId,
+      { count: number; totalRisk: number; totalCert: number; points: { x: number; y: number }[] }
+    >();
+
+    for (const node of nodes) {
+      const data = node.data as Record<string, unknown>;
+      const sectorId = (data.macroSectorId as MacroSectorId) ?? 'other';
+      const metrics = data.metrics as { riskIndex: number; certHealthPercent: number } | undefined;
+
+      const existing = sectorData.get(sectorId) ?? {
+        count: 0,
+        totalRisk: 0,
+        totalCert: 0,
+        points: [],
+      };
+      existing.count += 1;
+      existing.totalRisk += metrics?.riskIndex ?? 0;
+      existing.totalCert += metrics?.certHealthPercent ?? 0;
+      existing.points.push({
+        x: node.position.x + NODE_HALF,
+        y: node.position.y + NODE_HALF,
+      });
+      sectorData.set(sectorId, existing);
     }
 
-    // Average risk per sector
-    const avgRisk =
-      riskAnalysis && riskAnalysis.length > 0
-        ? Math.round(riskAnalysis.reduce((s, r) => s + r.riskScore, 0) / riskAnalysis.length)
-        : 0;
+    return MACRO_SECTORS.filter((ms) => (sectorData.get(ms.id)?.count ?? 0) > 0).map((ms) => {
+      const sd = sectorData.get(ms.id)!;
+      // Position badge below the cluster bounding box
+      const bbox = computeBoundingBox(sd.points);
+      const cx = (bbox.minX + bbox.maxX) / 2;
+      const cy = bbox.maxY + 30;
 
-    // Cert percent
-    const certCount = variants.filter((v) => v.certificationStatus === 'certified').length;
-    const certPercent = variants.length > 0 ? Math.round((certCount / variants.length) * 100) : 0;
-
-    return MACRO_SECTORS.filter((ms) => (sectorIndustries.get(ms.id) ?? 0) > 0).map((ms) => {
-      const anchor = anchorMap.get(ms.id) ?? computeClusterAnchor(ms, ringRadius);
       return {
         id: ms.id,
-        cx: anchor.x,
-        cy: anchor.y,
-        industryCount: sectorIndustries.get(ms.id) ?? 0,
-        avgRisk,
-        certPercent,
+        cx,
+        cy,
+        industryCount: sd.count,
+        avgRisk: sd.count > 0 ? Math.round(sd.totalRisk / sd.count) : 0,
+        certPercent: sd.count > 0 ? Math.round(sd.totalCert / sd.count) : 0,
         color: ms.glowColor,
       };
     });
-  }, [industries, variants, riskAnalysis, anchorMap, ringRadius]);
+  }, [nodes]);
 
   return (
     <div
@@ -77,8 +91,7 @@ export function SectorBadgeOverlay({
           className="absolute"
           style={{
             left: b.cx - 50,
-            top:
-              b.cy + (MACRO_SECTORS.find((m) => m.id === b.id)?.boundaryRadius ?? 200) * 0.75 + 12,
+            top: b.cy,
             width: 100,
           }}
         >

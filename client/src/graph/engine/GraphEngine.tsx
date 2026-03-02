@@ -58,7 +58,7 @@ import { GlobalMetricsStrip } from '../widgets/GlobalMetricsStrip';
 import { HeatmapOverlay } from '../overlays/HeatmapOverlay';
 import { SectorBoundaryOverlay } from '../overlays/SectorBoundaryOverlay';
 import { SectorBadgeOverlay } from '../overlays/SectorBadgeOverlay';
-import { SectorFilterBar } from '../widgets/SectorFilterBar';
+import { SectorSelectorBar } from '../widgets/SectorSelectorBar';
 import { MetricDetailPanel } from '../panels/MetricDetailPanel';
 import { AgentBrainOrb } from '../widgets/AgentBrainOrb';
 import { AltitudeBreadcrumb } from '../altitude/AltitudeBreadcrumb';
@@ -154,6 +154,10 @@ function GraphEngineInner() {
     useAppSelector(
       (s) => (s.graph as unknown as { hiddenSectorIds?: MacroSectorId[] }).hiddenSectorIds,
     ) ?? [];
+  const focusedSectorId =
+    useAppSelector(
+      (s) => (s.graph as unknown as { focusedSectorId?: MacroSectorId | null }).focusedSectorId,
+    ) ?? null;
 
   // Altitude-scoped data (replaces useGraphData)
   const {
@@ -223,6 +227,55 @@ function GraphEngineInner() {
       return () => clearTimeout(timer);
     }
   }, [nodes.length, altitude, reactFlowInstance]);
+
+  // Compute visible sector IDs from laid-out nodes
+  const visibleSectorIds = useMemo(() => {
+    const ids = new Set<MacroSectorId>();
+    for (const node of nodes) {
+      const data = node.data as Record<string, unknown>;
+      const msId = data.macroSectorId as MacroSectorId | undefined;
+      if (msId) ids.add(msId);
+    }
+    return ids;
+  }, [nodes]);
+
+  // Auto-zoom on sector focus change
+  const lastFocusRef = useRef<MacroSectorId | null>(null);
+
+  useEffect(() => {
+    if (focusedSectorId === lastFocusRef.current) return;
+    lastFocusRef.current = focusedSectorId;
+    if (nodes.length === 0) return;
+
+    if (focusedSectorId === null) {
+      // Reset to full view
+      const timer = setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 400 });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+
+    // Collect node IDs belonging to focused sector
+    const sectorNodeIds = nodes
+      .filter((n) => {
+        const data = n.data as Record<string, unknown>;
+        return (data.macroSectorId as MacroSectorId) === focusedSectorId;
+      })
+      .map((n) => ({ id: n.id }));
+
+    if (sectorNodeIds.length === 0) return;
+
+    // Animate camera to bounding box of sector nodes
+    const timer = setTimeout(() => {
+      reactFlowInstance.fitView({
+        nodes: sectorNodeIds,
+        duration: 400,
+        padding: 0.15,
+      });
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [focusedSectorId, nodes, reactFlowInstance]);
 
   // -- Event Handlers (routed through AltitudeController) --
   const onNodeClick: NodeMouseHandler = useCallback(
@@ -347,8 +400,12 @@ function GraphEngineInner() {
       {/* Sector boundary + badge overlays (GLOBAL only) */}
       {altitude === 'GLOBAL' && (
         <>
-          <SectorBoundaryOverlay anchorMap={anchorMap} centerSectorId={centerSectorId} />
-          <SectorBadgeOverlay anchorMap={anchorMap} />
+          <SectorBoundaryOverlay
+            nodes={nodes}
+            anchorMap={anchorMap}
+            centerSectorId={centerSectorId}
+          />
+          <SectorBadgeOverlay anchorMap={anchorMap} nodes={nodes} />
         </>
       )}
 
@@ -385,8 +442,8 @@ function GraphEngineInner() {
         </div>
       )}
 
-      {/* Sector Filter Panel (GLOBAL only) */}
-      {altitude === 'GLOBAL' && <SectorFilterBar />}
+      {/* Sector Selector (GLOBAL only) */}
+      {altitude === 'GLOBAL' && <SectorSelectorBar visibleSectorIds={visibleSectorIds} />}
 
       {/* System Health Orb */}
       <SystemHealthOrb />

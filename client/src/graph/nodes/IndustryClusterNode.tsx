@@ -36,7 +36,7 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
   const macroSectorId = (d.macroSectorId as MacroSectorId) ?? 'other';
   const macroSectorLabel = (d.macroSectorLabel as string) ?? '';
 
-  // Render-time opacity from Redux — no data recomputation on hover
+  // Render-time opacity from Redux — no data recomputation on hover/focus
   const hoveredMacroSectorId =
     useAppSelector(
       (s) =>
@@ -44,7 +44,19 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           .hoveredMacroSectorId,
     ) ?? null;
 
-  const opacity = hoveredMacroSectorId && macroSectorId !== hoveredMacroSectorId ? 0.3 : 1;
+  const focusedSectorId =
+    useAppSelector(
+      (s) => (s.graph as unknown as { focusedSectorId?: MacroSectorId | null }).focusedSectorId,
+    ) ?? null;
+
+  // Focus takes priority: focused sector nodes stay full, others dim to 10%
+  // Hover is secondary: hovered sector nodes stay full, others dim to 30%
+  let opacity = 1;
+  if (focusedSectorId) {
+    opacity = macroSectorId === focusedSectorId ? 1 : 0.1;
+  } else if (hoveredMacroSectorId) {
+    opacity = macroSectorId === hoveredMacroSectorId ? 1 : 0.3;
+  }
 
   const [hovered, setHovered] = useState(false);
 

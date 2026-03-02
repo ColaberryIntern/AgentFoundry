@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setActiveMetricPanel } from '../state/graphSlice';
+import { MACRO_SECTORS } from '../altitude/macroSectors';
+import type { MacroSectorId } from '../altitude/macroSectors';
 
 interface MetricDef {
   id: string;
@@ -78,48 +80,99 @@ export function GlobalMetricsStrip() {
   const { marketplace, dashboard } = useAppSelector((s) => s.orchestrator);
   const { riskAnalysis } = useAppSelector((s) => s.compliance);
 
-  // 1. System Health: average intelligence score
+  const focusedSectorId =
+    useAppSelector(
+      (s) => (s.graph as unknown as { focusedSectorId?: MacroSectorId | null }).focusedSectorId,
+    ) ?? null;
+
+  // Resolve sector codes for focused sector
+  const sectorCodes = useMemo((): Set<string> | null => {
+    if (!focusedSectorId) return null;
+    const ms = MACRO_SECTORS.find((m) => m.id === focusedSectorId);
+    if (!ms) return null;
+    return new Set(ms.sectorCodes);
+  }, [focusedSectorId]);
+
+  // Scope data by focused sector
+  const scopedIndustries = useMemo(() => {
+    if (!sectorCodes) return industries;
+    return industries.filter((ind) => sectorCodes.has(ind.sector));
+  }, [industries, sectorCodes]);
+
+  const scopedIndustryCodes = useMemo(() => {
+    return new Set(scopedIndustries.map((i) => i.code));
+  }, [scopedIndustries]);
+
+  const scopedUseCases = useMemo(() => {
+    if (!sectorCodes) return useCases;
+    return useCases.filter((uc) =>
+      uc.industryScope?.some((code: string) => scopedIndustryCodes.has(code)),
+    );
+  }, [useCases, sectorCodes, scopedIndustryCodes]);
+
+  const scopedVariants = useMemo(() => {
+    if (!sectorCodes) return variants;
+    return variants.filter((v) => v.industryCode && scopedIndustryCodes.has(v.industryCode));
+  }, [variants, sectorCodes, scopedIndustryCodes]);
+
+  const scopedMarketplace = useMemo(() => {
+    const arr = marketplace ?? [];
+    if (!sectorCodes) return arr;
+    const scopedVariantIds = new Set(scopedVariants.map((v) => v.id));
+    return arr.filter((m) => m.agentVariantId && scopedVariantIds.has(m.agentVariantId));
+  }, [marketplace, sectorCodes, scopedVariants]);
+
+  // 1. System Health: average intelligence score (global — not sector-scopeable)
   const systemHealth =
     intelligence && intelligence.length > 0
       ? Math.round(intelligence.reduce((s, i) => s + (i.score ?? 0), 0) / intelligence.length)
       : 0;
 
-  // 2. Risk Concentration: weighted avg of high/critical risks
+  // 2. Risk Concentration: weighted avg of risks (global — not sector-scopeable)
   const riskConcentration =
     riskAnalysis && riskAnalysis.length > 0
       ? Math.round(riskAnalysis.reduce((s, r) => s + r.riskScore, 0) / riskAnalysis.length)
       : 0;
 
-  // 3. Coverage Gap: industries without deployments (approximated by use case coverage)
-  const industriesWithUC = new Set(useCases.flatMap((uc) => uc.industryScope ?? []));
+  // 3. Coverage Gap: industries without use case coverage
+  const industriesWithUC = new Set(scopedUseCases.flatMap((uc) => uc.industryScope ?? []));
   const coverageGap =
-    industries.length > 0
-      ? Math.round(((industries.length - industriesWithUC.size) / industries.length) * 100)
+    scopedIndustries.length > 0
+      ? Math.round(
+          ((scopedIndustries.length - industriesWithUC.size) / scopedIndustries.length) * 100,
+        )
       : 0;
 
   // 4. Cert Strength: certified variants / total variants
-  const certifiedCount = variants.filter((v) => v.certificationStatus === 'certified').length;
+  const certifiedCount = scopedVariants.filter((v) => v.certificationStatus === 'certified').length;
   const certStrength =
-    variants.length > 0 ? Math.round((certifiedCount / variants.length) * 100) : 0;
+    scopedVariants.length > 0 ? Math.round((certifiedCount / scopedVariants.length) * 100) : 0;
 
   // 5. Marketplace Readiness: approved+published / total marketplace
-  const marketplaceArr = marketplace ?? [];
-  const readyCount = marketplaceArr.filter(
+  const readyCount = scopedMarketplace.filter(
     (m) => m.status === 'approved' || m.status === 'published',
   ).length;
   const marketplaceReadiness =
-    marketplaceArr.length > 0 ? Math.round((readyCount / marketplaceArr.length) * 100) : 0;
+    scopedMarketplace.length > 0 ? Math.round((readyCount / scopedMarketplace.length) * 100) : 0;
 
   // 6. Active Agent Impact: count of deployed variants
-  const activeAgentCount = variants.filter((v) => v.deployments && v.deployments.length > 0).length;
+  const activeAgentCount = scopedVariants.filter(
+    (v) => v.deployments && v.deployments.length > 0,
+  ).length;
 
-  // 7. Autonomy Confidence: from orchestrator dashboard
+  // 7. Autonomy Confidence: from orchestrator dashboard (global)
   const autonomyConfidence = dashboard ? Math.round((dashboard.systemConfidence ?? 0) * 100) : 0;
 
   const metrics: MetricDef[] = [
     { id: 'systemHealth', label: 'System Health', value: systemHealth, color: '#3b82f6' },
     { id: 'riskConcentration', label: 'Risk Conc.', value: riskConcentration, color: '#ef4444' },
-    { id: 'coverageGap', label: 'Coverage Gap', value: coverageGap, suffix: '%', color: '#f59e0b' },
+    {
+      id: 'coverageGap',
+      label: 'Coverage Gap',
+      value: coverageGap,
+      suffix: '%',
+      color: '#f59e0b',
+    },
     {
       id: 'certStrength',
       label: 'Cert Strength',
@@ -134,7 +187,12 @@ export function GlobalMetricsStrip() {
       suffix: '%',
       color: '#ec4899',
     },
-    { id: 'activeAgentImpact', label: 'Active Agents', value: activeAgentCount, color: '#a855f7' },
+    {
+      id: 'activeAgentImpact',
+      label: 'Active Agents',
+      value: activeAgentCount,
+      color: '#a855f7',
+    },
     {
       id: 'autonomyConfidence',
       label: 'Autonomy',
@@ -148,6 +206,10 @@ export function GlobalMetricsStrip() {
     dispatch(setActiveMetricPanel(metricId));
   };
 
+  const focusedLabel = focusedSectorId
+    ? MACRO_SECTORS.find((m) => m.id === focusedSectorId)?.label
+    : null;
+
   return (
     <div className="absolute top-10 left-1/2 -translate-x-1/2 z-30">
       <div className="flex items-center gap-0.5 px-3 py-1.5 rounded-xl bg-[var(--surface-primary)]/80 backdrop-blur-md border border-white/5 shadow-lg">
@@ -155,6 +217,11 @@ export function GlobalMetricsStrip() {
           <AnimatedMetric key={m.id} {...m} onClick={handleMetricClick} />
         ))}
       </div>
+      {focusedLabel && (
+        <div className="text-[8px] text-[var(--text-muted)]/60 text-center mt-0.5">
+          Showing: {focusedLabel}
+        </div>
+      )}
     </div>
   );
 }
