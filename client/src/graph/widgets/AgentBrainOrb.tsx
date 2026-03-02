@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAppSelector } from '../../store/hooks';
 import { AgentBrainPanel } from '../panels/AgentBrainPanel';
+import { useSPIRankings } from '../intelligence/useSPIRankings';
 
 /**
  * Persistent AI agent orb (bottom-right). Shows badge counts for
@@ -29,7 +30,12 @@ export function AgentBrainOrb() {
     (v) => v.certificationStatus === 'pending' || v.certificationStatus === 'expired',
   ).length;
 
-  const totalAlerts = suggestionCount + alertCount + expansionCount + certExpiringCount;
+  // SPI intelligence: count high-priority industries (SPI > 70)
+  const { allRanked } = useSPIRankings();
+  const highSpiCount = allRanked.filter((r) => r.spiScore > 70).length;
+
+  const totalAlerts =
+    suggestionCount + alertCount + expansionCount + certExpiringCount + highSpiCount;
   const hasAlerts = totalAlerts > 0;
 
   const prefersReducedMotion =
@@ -83,6 +89,7 @@ export function AgentBrainOrb() {
           {expansionCount > 0 && (
             <BadgePill count={expansionCount} label="expansion" color="#10b981" />
           )}
+          {highSpiCount > 0 && <BadgePill count={highSpiCount} label="high SPI" color="#a855f7" />}
         </div>
       </div>
 

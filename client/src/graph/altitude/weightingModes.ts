@@ -23,7 +23,12 @@ export const WEIGHTING_CONFIGS: Record<WeightingMode, WeightingConfig> = {
     id: 'coverage',
     label: 'Coverage',
     description: 'Sized by use case and stack deployment',
-    compute: (c) => clamp(BASE_SIZE + c.useCaseCount * 8 + c.stackCount * 5, MIN_SIZE, MAX_SIZE),
+    compute: (c) =>
+      clamp(
+        BASE_SIZE + Math.pow(c.useCaseCount, 0.7) * 15 + Math.pow(c.stackCount, 0.7) * 8,
+        MIN_SIZE,
+        MAX_SIZE,
+      ),
   },
   risk: {
     id: 'risk',

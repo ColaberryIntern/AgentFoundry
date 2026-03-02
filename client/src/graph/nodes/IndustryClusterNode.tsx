@@ -6,11 +6,15 @@ import type { MacroSectorId } from '../altitude/macroSectors';
 
 /**
  * Circular bubble node for GLOBAL altitude.
- * Size ∝ weighting mode, fill = risk gradient, ring = cert health gradient,
- * ring thickness ∝ cert%, volatility pulse ∝ volatilityScore.
  *
- * Opacity is computed at render time from Redux hoveredMacroSectorId —
- * this prevents hover from triggering layout re-simulation.
+ * 7 simultaneous KPI channels:
+ *   1. Radius     → useCaseCount (power curve)
+ *   2. Fill tint  → riskIndex (20-35% opacity gradient)
+ *   3. Outer ring → certHealthPercent (1-4px, green/amber/red arc)
+ *   4. Inner arc  → coveragePercent (green arc over gray track)
+ *   5. Glow       → revenueScore (outer blur if ≥ 60)
+ *   6. Dot        → volatilityScore (gray/amber/red static marker)
+ *   7. Text       → title + NAICS code + UC count
  */
 function IndustryClusterNodeInner({ data }: NodeProps) {
   const d = data as Record<string, unknown>;
@@ -33,6 +37,8 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
   const certRingColor = (d.certRingColor as string) ?? riskColor;
   const certHealth = metrics?.certHealthPercent ?? 0;
   const volatilityScore = (d.volatilityScore as number) ?? metrics?.volatilityScore ?? 0;
+  const coveragePercent = (d.coveragePercent as number) ?? metrics?.coveragePercent ?? 0;
+  const revenueScore = (d.revenueScore as number) ?? 0;
   const macroSectorId = (d.macroSectorId as MacroSectorId) ?? 'other';
   const macroSectorLabel = (d.macroSectorLabel as string) ?? '';
 
@@ -60,19 +66,29 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
 
   const [hovered, setHovered] = useState(false);
 
-  // SVG ring for cert health — variable thickness based on cert%
-  const certStrokeWidth = 2 + (certHealth / 100) * 4; // 2-6px
+  // -- KPI 3: Cert health ring — variable thickness based on cert%
+  const certStrokeWidth = 1 + (certHealth / 100) * 3; // 1-4px per spec
   const radius = bubbleSize / 2 - 6;
   const circumference = 2 * Math.PI * radius;
   const certArc = (certHealth / 100) * circumference;
 
-  const prefersReducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  // -- KPI 4: Coverage gap arc — inner ring
+  const coverageRadius = radius - certStrokeWidth - 3;
+  const coverageCircum = 2 * Math.PI * coverageRadius;
+  const coverageArc = (coveragePercent / 100) * coverageCircum;
 
-  // Volatility pulse: threshold 30, speed scales with score
-  const hasVolatilityPulse = volatilityScore > 30 && !prefersReducedMotion;
-  const pulseDuration = hasVolatilityPulse ? `${Math.max(1, 4 - volatilityScore / 30)}s` : '2s';
+  // -- KPI 2: Risk fill tint opacity (20-35%)
+  const riskIndex = metrics?.riskIndex ?? 0;
+  const riskFillOpacity = 0.2 + (riskIndex / 100) * 0.15;
+
+  // -- KPI 5: Revenue glow
+  const hasRevenueGlow = revenueScore >= 60;
+  const revenueGlowSize = hasRevenueGlow ? 12 + (revenueScore - 60) * 0.3 : 0;
+
+  // -- KPI 6: Volatility dot
+  const volatilityDotColor =
+    volatilityScore > 70 ? '#ef4444' : volatilityScore > 40 ? '#f59e0b' : '#6b7280';
+  const volatilityDotR = 3 + (volatilityScore / 100) * 3;
 
   // Depth layering: larger bubbles slightly more opaque
   const baseOpacity = 0.8 + (bubbleSize / 220) * 0.2;
@@ -86,8 +102,10 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
         opacity: opacity * baseOpacity,
         transform: hovered ? 'scale(1.05)' : 'scale(1)',
         filter: hovered ? `drop-shadow(0 4px 16px ${riskColor}40)` : 'none',
+        boxShadow: hasRevenueGlow ? `0 0 ${revenueGlowSize}px ${riskColor}30` : 'none',
+        borderRadius: '50%',
         transition:
-          'opacity 200ms ease, transform 200ms ease, filter 200ms ease, width 400ms ease, height 400ms ease',
+          'opacity 200ms ease, transform 200ms ease, filter 200ms ease, box-shadow 300ms ease, width 400ms ease, height 400ms ease',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -98,34 +116,25 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
         viewBox={`0 0 ${bubbleSize} ${bubbleSize}`}
         className="absolute inset-0"
       >
-        {/* Background circle */}
+        {/* KPI 2: Background circle — risk tint (20-35% opacity) */}
         <circle
           cx={bubbleSize / 2}
           cy={bubbleSize / 2}
           r={radius + 2}
           fill={riskColor}
-          opacity={0.08}
+          opacity={riskFillOpacity}
         />
 
-        {/* Inner glow — volatility pulse */}
+        {/* Inner glow */}
         <circle
           cx={bubbleSize / 2}
           cy={bubbleSize / 2}
           r={radius - 10}
           fill={riskColor}
-          opacity={0.12}
-        >
-          {hasVolatilityPulse && (
-            <animate
-              attributeName="opacity"
-              values="0.06;0.22;0.06"
-              dur={pulseDuration}
-              repeatCount="indefinite"
-            />
-          )}
-        </circle>
+          opacity={0.08}
+        />
 
-        {/* Cert health ring — background track */}
+        {/* KPI 3: Cert health ring — background track */}
         <circle
           cx={bubbleSize / 2}
           cy={bubbleSize / 2}
@@ -136,7 +145,7 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           opacity={0.15}
         />
 
-        {/* Cert health ring — active arc with variable thickness */}
+        {/* KPI 3: Cert health ring — active arc with variable thickness */}
         <circle
           cx={bubbleSize / 2}
           cy={bubbleSize / 2}
@@ -149,21 +158,55 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           transform={`rotate(-90 ${bubbleSize / 2} ${bubbleSize / 2})`}
           opacity={0.8}
         />
+
+        {/* KPI 4: Coverage gap arc — gray track */}
+        <circle
+          cx={bubbleSize / 2}
+          cy={bubbleSize / 2}
+          r={coverageRadius}
+          fill="none"
+          stroke="#374151"
+          strokeWidth={1.5}
+          opacity={0.2}
+        />
+
+        {/* KPI 4: Coverage gap arc — green fill */}
+        <circle
+          cx={bubbleSize / 2}
+          cy={bubbleSize / 2}
+          r={coverageRadius}
+          fill="none"
+          stroke="#10b981"
+          strokeWidth={1.5}
+          strokeDasharray={`${coverageArc} ${coverageCircum}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${bubbleSize / 2} ${bubbleSize / 2})`}
+          opacity={0.7}
+        />
+
+        {/* KPI 6: Volatility marker — static colored dot at bottom-right */}
+        {volatilityScore > 0 && (
+          <circle
+            cx={bubbleSize / 2 + radius * 0.6}
+            cy={bubbleSize / 2 + radius * 0.6}
+            r={volatilityDotR}
+            fill={volatilityDotColor}
+            opacity={0.85}
+          />
+        )}
       </svg>
 
-      {/* Content */}
+      {/* KPI 7: Content text — title + code · UC count */}
       <div className="relative z-10 text-center px-2">
         <div className="text-[11px] font-bold text-[var(--text-primary)] leading-tight line-clamp-2">
           {title}
         </div>
-        <div className="text-[9px] text-[var(--text-muted)] mt-0.5">{code}</div>
+        <div className="text-[9px] text-[var(--text-muted)] mt-0.5">
+          {code} · {useCaseCount} UC
+        </div>
         {macroSectorLabel && (
           <div className="text-[8px] text-[var(--text-muted)]/60 mt-0.5">{macroSectorLabel}</div>
         )}
-        <div className="flex items-center justify-center gap-2 mt-1">
-          <span className="text-[9px] text-blue-400">{useCaseCount} UC</span>
-          <span className="text-[9px] text-cyan-400">{agentCount} Agents</span>
-        </div>
       </div>
 
       {/* Hover mini-panel */}
@@ -172,7 +215,7 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
           className="absolute z-50 pointer-events-none"
           style={{ top: bubbleSize + 4, left: '50%', transform: 'translateX(-50%)' }}
         >
-          <div className="bg-[var(--surface-primary)]/95 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2 shadow-xl min-w-[150px]">
+          <div className="bg-[var(--surface-primary)]/95 backdrop-blur-md border border-white/10 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
             <div className="text-[10px] text-[var(--text-primary)] font-semibold mb-1 truncate">
               {title}
             </div>
@@ -181,14 +224,14 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
               <span className="text-[var(--text-primary)] text-right">{useCaseCount}</span>
               <span className="text-[var(--text-muted)]">Stacks</span>
               <span className="text-[var(--text-primary)] text-right">{stackCount}</span>
+              <span className="text-[var(--text-muted)]">Agents</span>
+              <span className="text-[var(--text-primary)] text-right">{agentCount}</span>
               <span className="text-[var(--text-muted)]">Risk</span>
               <span className="text-right" style={{ color: riskColor }}>
-                {metrics?.riskIndex ?? 0}
+                {riskIndex}
               </span>
               <span className="text-[var(--text-muted)]">Coverage</span>
-              <span className="text-[var(--text-primary)] text-right">
-                {metrics?.coveragePercent ?? 0}%
-              </span>
+              <span className="text-[var(--text-primary)] text-right">{coveragePercent}%</span>
               <span className="text-[var(--text-muted)]">Cert %</span>
               <span className="text-right" style={{ color: certRingColor }}>
                 {certHealth}%
@@ -196,13 +239,13 @@ function IndustryClusterNodeInner({ data }: NodeProps) {
               <span className="text-[var(--text-muted)]">Volatility</span>
               <span className="text-[var(--text-primary)] text-right">{volatilityScore}</span>
               <span className="text-[var(--text-muted)]">Revenue</span>
-              <span className="text-[var(--text-primary)] text-right">{agentCount} agents</span>
+              <span className="text-[var(--text-primary)] text-right">{revenueScore}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Hover glow */}
+      {/* Hover glow ring */}
       <div
         className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
         style={{
@@ -234,6 +277,8 @@ export const IndustryClusterNode = memo(IndustryClusterNodeInner, (prev, next) =
     p.riskColor === n.riskColor &&
     p.certRingColor === n.certRingColor &&
     p.volatilityScore === n.volatilityScore &&
+    p.coveragePercent === n.coveragePercent &&
+    p.revenueScore === n.revenueScore &&
     p.macroSectorId === n.macroSectorId &&
     p.title === n.title &&
     p.code === n.code &&

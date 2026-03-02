@@ -1,9 +1,20 @@
 import { useState } from 'react';
 import { useAppSelector } from '../../store/hooks';
+import { useSPIRankings } from '../intelligence/useSPIRankings';
+import type { SPIResult, SPIBreakdown } from '../intelligence/spiEngine';
+import { getMacroSector } from '../altitude/macroSectors';
+import type { MacroSectorId } from '../altitude/macroSectors';
 
-type BrainTab = 'suggestions' | 'riskAlerts' | 'expansion' | 'governance' | 'quickActions';
+type BrainTab =
+  | 'intelligence'
+  | 'suggestions'
+  | 'riskAlerts'
+  | 'expansion'
+  | 'governance'
+  | 'quickActions';
 
 const TAB_LABELS: Record<BrainTab, string> = {
+  intelligence: 'SPI Rankings',
   suggestions: 'Suggestions',
   riskAlerts: 'Risk Alerts',
   expansion: 'Expansion',
@@ -12,11 +23,13 @@ const TAB_LABELS: Record<BrainTab, string> = {
 };
 
 /**
- * 5-tab slide-in panel for the AI Agent Brain.
+ * 6-tab slide-in panel for the AI Agent Brain.
+ * The Intelligence tab is the default and shows context-reactive SPI rankings.
  */
 export function AgentBrainPanel({ onClose }: { onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<BrainTab>('suggestions');
+  const [activeTab, setActiveTab] = useState<BrainTab>('intelligence');
   const { intents, violations, dashboard } = useAppSelector((s) => s.orchestrator);
+  const { globalTop5, sectorTop5, industryDetail, allRanked } = useSPIRankings();
 
   const suggestionCount = intents.filter(
     (i) => i.status === 'proposed' || i.status === 'detected',
@@ -26,8 +39,10 @@ export function AgentBrainPanel({ onClose }: { onClose: () => void }) {
   const governanceCount = intents.filter(
     (i) => i.intentType === 'certification_renewal' || i.intentType === 'drift_remediation',
   ).length;
+  const highSpiCount = allRanked.filter((r) => r.spiScore > 70).length;
 
   const tabCounts: Record<BrainTab, number> = {
+    intelligence: highSpiCount,
     suggestions: suggestionCount,
     riskAlerts: alertCount,
     expansion: expansionCount,
@@ -92,6 +107,13 @@ export function AgentBrainPanel({ onClose }: { onClose: () => void }) {
 
         {/* Tab content */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
+          {activeTab === 'intelligence' && (
+            <IntelligenceTab
+              globalTop5={globalTop5}
+              sectorTop5={sectorTop5}
+              industryDetail={industryDetail}
+            />
+          )}
           {activeTab === 'suggestions' && <SuggestionsTab />}
           {activeTab === 'riskAlerts' && <RiskAlertsTab />}
           {activeTab === 'expansion' && <ExpansionTab />}
@@ -102,6 +124,163 @@ export function AgentBrainPanel({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Intelligence Tab — Context-Reactive SPI Rankings
+// ---------------------------------------------------------------------------
+
+const BREAKDOWN_LABELS: Record<keyof SPIBreakdown, { label: string; color: string }> = {
+  coverageGapScore: { label: 'Coverage Gap', color: '#3b82f6' },
+  riskExposureScore: { label: 'Risk', color: '#ef4444' },
+  revenueProxyScore: { label: 'Revenue', color: '#ec4899' },
+  certWeaknessScore: { label: 'Cert Weakness', color: '#f59e0b' },
+  volatilityScore: { label: 'Volatility', color: '#a855f7' },
+  agentSaturationScore: { label: 'Agent Gap', color: '#06b6d4' },
+};
+
+function IntelligenceTab({
+  globalTop5,
+  sectorTop5,
+  industryDetail,
+}: {
+  globalTop5: SPIResult[];
+  sectorTop5: SPIResult[];
+  industryDetail: SPIResult | null;
+}) {
+  const focusedSectorId =
+    useAppSelector(
+      (s) => (s.graph as unknown as { focusedSectorId?: MacroSectorId | null }).focusedSectorId,
+    ) ?? null;
+
+  // Mode C: Industry Detail
+  if (industryDetail) {
+    return <IndustryDetailView result={industryDetail} />;
+  }
+
+  // Mode B: Sector Top 5
+  if (focusedSectorId && sectorTop5.length > 0) {
+    const sectorConfig = getMacroSector(focusedSectorId);
+    return (
+      <div className="space-y-3">
+        <div className="text-[10px] font-semibold text-[var(--text-primary)]">
+          Top Priorities in {sectorConfig.label}
+        </div>
+        {sectorTop5.map((result) => (
+          <SPICard key={result.industryCode} result={result} />
+        ))}
+      </div>
+    );
+  }
+
+  // Mode A: Global Top 5
+  if (globalTop5.length === 0) {
+    return <EmptyTab message="No industries loaded for SPI analysis." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="text-[10px] font-semibold text-[var(--text-primary)]">
+        Global Strategic Priorities
+      </div>
+      {globalTop5.map((result) => (
+        <SPICard key={result.industryCode} result={result} />
+      ))}
+    </div>
+  );
+}
+
+function SPICard({ result }: { result: SPIResult }) {
+  return (
+    <div className="px-3 py-2 rounded-lg bg-white/3 border border-white/5">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[10px] font-medium text-[var(--text-primary)] truncate flex-1">
+          #{result.rank} {result.title}
+        </span>
+        <span className="text-[10px] font-bold text-indigo-400 ml-2">
+          {result.spiScore.toFixed(0)}
+        </span>
+      </div>
+      <div className="text-[8px] text-[var(--text-muted)] mb-1.5">NAICS {result.industryCode}</div>
+
+      {/* Mini breakdown bar */}
+      <div className="flex gap-0.5 h-1.5 mb-1.5 rounded-full overflow-hidden">
+        {(Object.keys(BREAKDOWN_LABELS) as (keyof SPIBreakdown)[]).map((key) => (
+          <div
+            key={key}
+            className="rounded-full"
+            style={{
+              flex: result.breakdown[key],
+              backgroundColor: BREAKDOWN_LABELS[key].color,
+              opacity: 0.7,
+              minWidth: result.breakdown[key] > 0 ? 2 : 0,
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="text-[8px] text-[var(--text-muted)] italic">{result.recommendedAction}</div>
+    </div>
+  );
+}
+
+function IndustryDetailView({ result }: { result: SPIResult }) {
+  return (
+    <div className="space-y-3">
+      <div className="text-[10px] font-semibold text-[var(--text-primary)]">
+        {result.title} — SPI Analysis
+      </div>
+
+      {/* Large SPI score */}
+      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+        <div className="text-[24px] font-bold text-indigo-400">{result.spiScore.toFixed(0)}</div>
+        <div>
+          <div className="text-[9px] text-[var(--text-muted)]">Strategic Priority Index</div>
+          <div className="text-[9px] text-[var(--text-primary)]">
+            Global Rank #{result.rank} · NAICS {result.industryCode}
+          </div>
+        </div>
+      </div>
+
+      {/* Sub-score breakdown bars */}
+      <div className="space-y-2">
+        {(Object.keys(BREAKDOWN_LABELS) as (keyof SPIBreakdown)[]).map((key) => {
+          const { label, color } = BREAKDOWN_LABELS[key];
+          const score = result.breakdown[key];
+          return (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[9px] text-[var(--text-muted)]">{label}</span>
+                <span className="text-[9px] font-bold" style={{ color }}>
+                  {Math.round(score)}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${score}%`,
+                    backgroundColor: color,
+                    opacity: 0.7,
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Recommended action */}
+      <div className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+        <div className="text-[9px] font-semibold text-emerald-400 mb-0.5">Recommended Action</div>
+        <div className="text-[9px] text-[var(--text-primary)]">{result.recommendedAction}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Existing Tabs (unchanged)
+// ---------------------------------------------------------------------------
 
 function SuggestionsTab() {
   const { intents } = useAppSelector((s) => s.orchestrator);

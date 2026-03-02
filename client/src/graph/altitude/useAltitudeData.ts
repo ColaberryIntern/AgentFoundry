@@ -90,6 +90,9 @@ export function useAltitudeData(): AltitudeDataResult {
             })
           : clusters;
 
+      // Pre-compute normalized revenue score (agentCount as proxy for marketplace maturity)
+      const maxAgentCount = Math.max(...visibleClusters.map((c) => c.agentCount), 1);
+
       const nodes: Node[] = visibleClusters.map((c) => {
         const macroSector = getMacroSector(c.sector);
         const macroSectorId = macroSector?.id ?? 'other';
@@ -118,6 +121,9 @@ export function useAltitudeData(): AltitudeDataResult {
             riskColor: riskToGradientColor(c.metrics.riskIndex),
             certRingColor: certToGradientColor(c.metrics.certHealthPercent),
             volatilityScore: c.metrics.volatilityScore ?? 0,
+            // KPI encoding data
+            coveragePercent: c.metrics.coveragePercent ?? 0,
+            revenueScore: Math.round(Math.min(100, (c.agentCount / maxAgentCount) * 100)),
             macroSectorId,
             macroSectorLabel,
           },
