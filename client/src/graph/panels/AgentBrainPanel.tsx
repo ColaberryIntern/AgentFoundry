@@ -66,6 +66,7 @@ export function AgentBrainPanel() {
   const [activeTab, setActiveTab] = useState<BrainTab>('insights');
   const scoped = useAltitudeScopedIntelligence();
   const chatMessages = useAppSelector((s) => s.graph.chatMessages);
+  const allIntents = useAppSelector((s) => s.orchestrator.intents);
 
   // Reset panel on altitude change
   useEffect(() => {
@@ -287,7 +288,13 @@ export function AgentBrainPanel() {
         {/* Tab content — scrollbar hidden */}
         <div className="flex-1 overflow-y-auto scrollbar-none px-4 py-3">
           {activeTab === 'insights' && (
-            <InsightsTab scoped={scoped} onTakeAction={handleTakeAction} />
+            <InsightsTab
+              scoped={scoped}
+              onTakeAction={handleTakeAction}
+              onApproveIntent={handleApproveIntent}
+              onDismissIntent={handleDismissIntent}
+              intents={allIntents}
+            />
           )}
           {activeTab === 'alerts' && (
             <AlertsTab
@@ -333,18 +340,52 @@ const BREAKDOWN_LABELS: Record<keyof SPIBreakdown, { label: string; color: strin
 function InsightsTab({
   scoped,
   onTakeAction,
+  onApproveIntent,
+  onDismissIntent,
+  intents,
 }: {
   scoped: ScopedIntelligence;
   onTakeAction: (result: SPIResult) => void;
+  onApproveIntent: (id: string) => void;
+  onDismissIntent: (id: string) => void;
+  intents: OrchestratorIntent[];
 }) {
   const { spiInsights } = scoped;
+
+  // Build lookup: industryCode → most recent manual_ui intent
+  const actionedMap = useMemo(() => {
+    const map = new Map<string, OrchestratorIntent>();
+    for (const intent of intents) {
+      if (intent.sourceSignal === 'manual_ui') {
+        const ic = (intent.context as Record<string, unknown>)?.industryCode as string | undefined;
+        if (ic && !map.has(ic)) map.set(ic, intent);
+      }
+    }
+    return map;
+  }, [intents]);
+
+  // Activity summary for manual intents
+  const manualIntents = useMemo(
+    () => intents.filter((i) => i.sourceSignal === 'manual_ui'),
+    [intents],
+  );
 
   if (!spiInsights) {
     return <EmptyTab message="No SPI data available at this level." />;
   }
 
   if (!Array.isArray(spiInsights)) {
-    return <IndustryDetailView result={spiInsights} onTakeAction={onTakeAction} />;
+    const detail = spiInsights;
+    const actionedIntent = actionedMap.get(detail.industryCode) ?? null;
+    return (
+      <IndustryDetailView
+        result={detail}
+        onTakeAction={onTakeAction}
+        actionedIntent={actionedIntent}
+        onApproveIntent={onApproveIntent}
+        onDismissIntent={onDismissIntent}
+      />
+    );
   }
 
   if (spiInsights.length === 0) {
@@ -353,12 +394,25 @@ function InsightsTab({
 
   return (
     <div className="space-y-3">
+      {/* Recent Actions activity strip */}
+      {manualIntents.length > 0 && <ActivityStrip intents={manualIntents} />}
+
       <div className="text-xs font-semibold text-[var(--text-primary)]">
         Strategic Priorities — {scoped.contextLabel}
       </div>
-      {spiInsights.map((result) => (
-        <SPICard key={result.industryCode} result={result} onTakeAction={onTakeAction} />
-      ))}
+      {spiInsights.map((result) => {
+        const actionedIntent = actionedMap.get(result.industryCode) ?? null;
+        return (
+          <SPICard
+            key={result.industryCode}
+            result={result}
+            onTakeAction={onTakeAction}
+            actionedIntent={actionedIntent}
+            onApproveIntent={onApproveIntent}
+            onDismissIntent={onDismissIntent}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -366,17 +420,21 @@ function InsightsTab({
 function SPICard({
   result,
   onTakeAction,
+  actionedIntent,
+  onApproveIntent,
+  onDismissIntent,
 }: {
   result: SPIResult;
   onTakeAction: (result: SPIResult) => void;
+  actionedIntent: OrchestratorIntent | null;
+  onApproveIntent: (id: string) => void;
+  onDismissIntent: (id: string) => void;
 }) {
-  const [created, setCreated] = useState(false);
-
-  const handleClick = () => {
-    onTakeAction(result);
-    setCreated(true);
-    setTimeout(() => setCreated(false), 2000);
-  };
+  // Show action button only if no active intent (or dismissed/cancelled)
+  const showAction =
+    !actionedIntent ||
+    actionedIntent.status === 'rejected' ||
+    actionedIntent.status === 'cancelled';
 
   return (
     <div className="px-3 py-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)]">
@@ -406,24 +464,21 @@ function SPICard({
         ))}
       </div>
 
-      <button
-        onClick={handleClick}
-        disabled={created}
-        className={`w-full text-left text-[10px] transition-colors cursor-pointer ${
-          created
-            ? 'text-emerald-500 dark:text-emerald-300 font-semibold'
-            : 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300'
-        }`}
-      >
-        {created ? (
-          'Intent created — view in Alerts tab'
-        ) : (
-          <>
-            <span className="font-medium">Action:</span>{' '}
-            <span className="italic">{result.recommendedAction}</span>
-          </>
-        )}
-      </button>
+      {showAction ? (
+        <button
+          onClick={() => onTakeAction(result)}
+          className="w-full text-left text-[10px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer"
+        >
+          <span className="font-medium">Action:</span>{' '}
+          <span className="italic">{result.recommendedAction}</span>
+        </button>
+      ) : (
+        <InlineIntentStatus
+          intent={actionedIntent!}
+          onApprove={onApproveIntent}
+          onDismiss={onDismissIntent}
+        />
+      )}
     </div>
   );
 }
@@ -431,9 +486,15 @@ function SPICard({
 function IndustryDetailView({
   result,
   onTakeAction,
+  actionedIntent,
+  onApproveIntent,
+  onDismissIntent,
 }: {
   result: SPIResult;
   onTakeAction: (result: SPIResult) => void;
+  actionedIntent: OrchestratorIntent | null;
+  onApproveIntent: (id: string) => void;
+  onDismissIntent: (id: string) => void;
 }) {
   const dominantKey = useMemo(() => {
     let maxKey: keyof SPIBreakdown = 'coverageGapScore';
@@ -493,7 +554,13 @@ function IndustryDetailView({
       <KPICorrelation result={result} dominantKey={dominantKey} />
 
       {/* Actionable recommended action */}
-      <ActionButton result={result} onTakeAction={onTakeAction} />
+      <ActionButton
+        result={result}
+        onTakeAction={onTakeAction}
+        actionedIntent={actionedIntent}
+        onApproveIntent={onApproveIntent}
+        onDismissIntent={onDismissIntent}
+      />
     </div>
   );
 }
@@ -501,54 +568,162 @@ function IndustryDetailView({
 function ActionButton({
   result,
   onTakeAction,
+  actionedIntent,
+  onApproveIntent,
+  onDismissIntent,
 }: {
   result: SPIResult;
   onTakeAction: (result: SPIResult) => void;
+  actionedIntent: OrchestratorIntent | null;
+  onApproveIntent: (id: string) => void;
+  onDismissIntent: (id: string) => void;
 }) {
-  const [created, setCreated] = useState(false);
+  const showAction =
+    !actionedIntent ||
+    actionedIntent.status === 'rejected' ||
+    actionedIntent.status === 'cancelled';
 
-  const handleClick = () => {
-    onTakeAction(result);
-    setCreated(true);
-    setTimeout(() => setCreated(false), 3000);
-  };
+  if (!showAction) {
+    return (
+      <InlineIntentStatus
+        intent={actionedIntent!}
+        onApprove={onApproveIntent}
+        onDismiss={onDismissIntent}
+        large
+      />
+    );
+  }
 
   return (
     <button
-      onClick={handleClick}
-      disabled={created}
-      className={`w-full px-3 py-2.5 rounded-lg border transition-colors text-left group ${
-        created
-          ? 'bg-emerald-500/20 border-emerald-500/30'
-          : 'bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20'
-      }`}
+      onClick={() => onTakeAction(result)}
+      className="w-full px-3 py-2.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-left group"
     >
       <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5 flex items-center gap-1.5">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
-          {created ? (
-            <path
-              d="M2 6l3 3 5-6"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ) : (
-            <path
-              d="M1 6h10M7 2l4 4-4 4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
+          <path
+            d="M1 6h10M7 2l4 4-4 4"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
-        {created ? 'Intent Created' : 'Take Action'}
+        Take Action
       </div>
       <div className="text-[11px] text-[var(--text-primary)] group-hover:text-emerald-700 dark:group-hover:text-emerald-200 transition-colors">
-        {created ? 'Visible in Orchestrator — status: proposed' : result.recommendedAction}
+        {result.recommendedAction}
       </div>
     </button>
+  );
+}
+
+/** Compact inline status showing the intent that was created, with approve/dismiss controls */
+function InlineIntentStatus({
+  intent,
+  onApprove,
+  onDismiss,
+  large,
+}: {
+  intent: OrchestratorIntent;
+  onApprove: (id: string) => void;
+  onDismiss: (id: string) => void;
+  large?: boolean;
+}) {
+  const isProposed = intent.status === 'proposed' || intent.status === 'detected';
+  const isApproved = intent.status === 'approved' || intent.status === 'completed';
+  const isExecuting = intent.status === 'executing' || intent.status === 'simulating';
+
+  const borderColor = isApproved
+    ? 'border-l-emerald-500'
+    : isExecuting
+      ? 'border-l-blue-500'
+      : 'border-l-indigo-500';
+
+  const statusLabel = intent.status.charAt(0).toUpperCase() + intent.status.slice(1);
+  const statusColor = isApproved
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : isExecuting
+      ? 'text-blue-600 dark:text-blue-400'
+      : 'text-indigo-600 dark:text-indigo-400';
+
+  return (
+    <div
+      className={`${large ? 'px-3 py-2.5' : 'px-2.5 py-2'} rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)] border-l-2 ${borderColor} mt-1.5`}
+    >
+      <div className="flex items-center gap-1.5 mb-1">
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 12 12"
+          fill="none"
+          className={`flex-shrink-0 ${statusColor}`}
+        >
+          <path
+            d="M2 6l3 3 5-6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className={`text-[10px] font-semibold ${statusColor}`}>Intent Created</span>
+        <span className="text-[9px] text-[var(--text-muted)]">·</span>
+        <span className={`text-[10px] font-medium ${statusColor}`}>{statusLabel}</span>
+      </div>
+      <div className="text-[10px] text-[var(--text-muted)] mb-1">
+        {intent.intentType.replace(/_/g, ' ')} · {intent.priority} priority
+      </div>
+
+      {isProposed && (
+        <div className="flex items-center gap-2 mt-1.5 pt-1.5 border-t border-[var(--border-subtle)]">
+          <button
+            onClick={() => onApprove(intent.id)}
+            className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium hover:bg-emerald-500/25 transition-colors"
+          >
+            Approve
+          </button>
+          <button
+            onClick={() => onDismiss(intent.id)}
+            className="px-2.5 py-1 rounded-md bg-[var(--surface-card-hover)] text-[var(--text-muted)] text-[10px] font-medium hover:bg-[var(--surface-tertiary)] transition-colors"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {isApproved && (
+        <div className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+          Queued for execution
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Activity strip showing summary of manually created intents */
+function ActivityStrip({ intents }: { intents: OrchestratorIntent[] }) {
+  const proposed = intents.filter((i) => i.status === 'proposed' || i.status === 'detected').length;
+  const approved = intents.filter(
+    (i) => i.status === 'approved' || i.status === 'completed' || i.status === 'executing',
+  ).length;
+  const dismissed = intents.filter(
+    (i) => i.status === 'rejected' || i.status === 'cancelled',
+  ).length;
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/10 text-[11px]">
+      <span className="font-medium text-indigo-600 dark:text-indigo-400">
+        {intents.length} action{intents.length !== 1 ? 's' : ''} taken
+      </span>
+      {proposed > 0 && <span className="text-[var(--text-muted)]">{proposed} pending</span>}
+      {approved > 0 && (
+        <span className="text-emerald-600 dark:text-emerald-400">{approved} approved</span>
+      )}
+      {dismissed > 0 && (
+        <span className="text-[var(--text-muted)] opacity-60">{dismissed} dismissed</span>
+      )}
+    </div>
   );
 }
 
