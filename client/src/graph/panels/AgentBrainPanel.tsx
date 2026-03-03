@@ -22,9 +22,12 @@ import {
   rejectLocalIntent,
 } from '../../store/orchestratorSlice';
 import { fetchUseCases, fetchAgentVariants } from '../../store/registrySlice';
+import { addNotification } from '../../store/notificationsSlice';
 import { fetchOntologyRelationships } from '../state/graphSlice';
+import { MACRO_SECTORS } from '../altitude/macroSectors';
 import type { SPIResult, SPIBreakdown } from '../intelligence/spiEngine';
 import type { OrchestratorIntent, GuardrailViolation } from '../../types/orchestrator';
+import type { Notification } from '../../services/notificationsApi';
 import type { AgentVariant } from '../../types/compliance';
 
 type BrainTab = 'insights' | 'alerts' | 'opportunities' | 'askAi';
@@ -76,6 +79,12 @@ export function AgentBrainPanel() {
   const demoMode =
     useAppSelector((s) => (s.graph as unknown as { demoMode?: boolean }).demoMode) ?? false;
 
+  // Completed manual intents — shown in Alerts tab instead of Expand section
+  const completedIntents = useMemo(
+    () => allIntents.filter((i) => i.status === 'completed' && i.sourceSignal === 'manual_ui'),
+    [allIntents],
+  );
+
   // Reset panel on altitude change
   useEffect(() => {
     setActiveTab('insights');
@@ -91,7 +100,8 @@ export function AgentBrainPanel() {
       ? scoped.spiInsights.length
       : 1
     : 0;
-  const alertCount = scoped.riskAlerts.length + scoped.governance.expiringVariants.length;
+  const alertCount =
+    scoped.riskAlerts.length + scoped.governance.expiringVariants.length + completedIntents.length;
   const opCount = scoped.suggestions.length + scoped.expansions.length;
 
   const tabCounts: Record<BrainTab, number> = {
@@ -128,11 +138,36 @@ export function AgentBrainPanel() {
     [scoped, dispatch],
   );
 
+  // Helper: create a client-side notification for the bell badge
+  const pushNotification = useCallback(
+    (title: string, message: string) => {
+      dispatch(
+        addNotification({
+          id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          userId: 'system',
+          type: 'system' as Notification['type'],
+          title,
+          message,
+          isRead: false,
+          metadata: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    },
+    [dispatch],
+  );
+
   // Action callbacks wired to Redux thunks — re-fetch registry after approval
   const handleApproveIntent = useCallback(
     (id: string) => {
+      const intent = allIntents.find((i) => i.id === id);
+      const label = intent?.title ?? id;
+      const typeLabel = intent?.intentType?.replace(/_/g, ' ') ?? 'Intent';
+
       if (demoMode) {
         dispatch(approveLocalIntent({ id }));
+        pushNotification(`Approved: ${label}`, `${typeLabel} has been approved and completed.`);
         return;
       }
       dispatch(approveIntent({ id })).then(() => {
@@ -141,9 +176,10 @@ export function AgentBrainPanel() {
         dispatch(fetchAgentVariants({}));
         dispatch(fetchOntologyRelationships({ limit: 500 }));
         dispatch(fetchDashboard());
+        pushNotification(`Approved: ${label}`, `${typeLabel} has been approved and completed.`);
       });
     },
-    [dispatch, demoMode],
+    [dispatch, demoMode, allIntents, pushNotification],
   );
 
   const handleDismissIntent = useCallback(
@@ -210,8 +246,9 @@ export function AgentBrainPanel() {
       } else {
         dispatch(createManualIntent(intentData));
       }
+      pushNotification(`Action created: ${result.title}`, intentData.description ?? '');
     },
-    [dispatch, demoMode],
+    [dispatch, demoMode, pushNotification],
   );
 
   // Create intent from a proactive suggestion
@@ -229,8 +266,9 @@ export function AgentBrainPanel() {
       } else {
         dispatch(createManualIntent(intentData));
       }
+      pushNotification(`New: ${suggestion.label}`, suggestion.description);
     },
-    [dispatch, demoMode],
+    [dispatch, demoMode, pushNotification],
   );
 
   // Check whether current tab has content to show description
@@ -344,6 +382,7 @@ export function AgentBrainPanel() {
           {activeTab === 'alerts' && (
             <AlertsTab
               scoped={scoped}
+              completedIntents={completedIntents}
               onApproveIntent={handleApproveIntent}
               onDismissIntent={handleDismissIntent}
               onResolveViolation={handleResolveViolation}
@@ -960,12 +999,14 @@ function KPICorrelation({
 
 function AlertsTab({
   scoped,
+  completedIntents,
   onApproveIntent,
   onDismissIntent,
   onResolveViolation,
   onRenewVariant,
 }: {
   scoped: ScopedIntelligence;
+  completedIntents: OrchestratorIntent[];
   onApproveIntent: (id: string) => void;
   onDismissIntent: (id: string) => void;
   onResolveViolation: (id: string) => void;
@@ -975,7 +1016,8 @@ function AlertsTab({
   const hasContent =
     riskAlerts.length > 0 ||
     governance.intents.length > 0 ||
-    governance.expiringVariants.length > 0;
+    governance.expiringVariants.length > 0 ||
+    completedIntents.length > 0;
 
   if (!hasContent) {
     return <EmptyTab message="No alerts at this level." />;
@@ -983,6 +1025,14 @@ function AlertsTab({
 
   return (
     <div className="space-y-4">
+      {completedIntents.length > 0 && (
+        <Section title={`Completed Actions (${completedIntents.length})`}>
+          {completedIntents.map((intent) => (
+            <CompletedIntentCard key={intent.id} intent={intent} />
+          ))}
+        </Section>
+      )}
+
       {riskAlerts.length > 0 && (
         <Section title={`Risk Alerts (${riskAlerts.length})`}>
           {riskAlerts.map((v) => (
@@ -1007,6 +1057,48 @@ function AlertsTab({
       {governance.expiringVariants.length > 0 && (
         <CertAttentionSection variants={governance.expiringVariants} onRenew={onRenewVariant} />
       )}
+    </div>
+  );
+}
+
+function CompletedIntentCard({ intent }: { intent: OrchestratorIntent }) {
+  const actionLabel =
+    intent.intentType === 'gap_coverage' || intent.intentType === 'risk_mitigation'
+      ? 'Use case + agent created'
+      : intent.intentType === 'expansion_opportunity'
+        ? 'Agent variant created'
+        : intent.intentType === 'certification_renewal'
+          ? 'Recertification completed'
+          : intent.intentType === 'marketplace_submission'
+            ? 'Marketplace submission done'
+            : 'Action completed';
+
+  return (
+    <div className="px-3 py-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 border-l-2 border-l-emerald-500">
+      <div className="flex items-center gap-1.5 mb-1">
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 12 12"
+          fill="none"
+          className="text-emerald-600 dark:text-emerald-400 flex-shrink-0"
+        >
+          <path
+            d="M2 6l3 3 5-6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+          Completed
+        </span>
+      </div>
+      <div className="text-xs font-medium text-[var(--text-primary)] mb-0.5">{intent.title}</div>
+      <div className="text-[10px] text-[var(--text-muted)]">
+        {actionLabel} &middot; {intent.intentType.replace(/_/g, ' ')}
+      </div>
     </div>
   );
 }
@@ -1118,22 +1210,26 @@ interface ExpandSystemItem {
 function useExpandSystemItems(scoped: ScopedIntelligence): ExpandSystemItem[] {
   const { useCases, industries, variants } = useAppSelector((s) => s.registry);
   const allIntents = useAppSelector((s) => s.orchestrator.intents);
+  const ontologyRelationships = useAppSelector((s) => s.graph.ontology.relationships);
 
   return useMemo(() => {
     const items: ExpandSystemItem[] = [];
 
     // Collect manual_ui intents with their industry codes for tracking
+    // Exclude 'completed' — those are shown in the Alerts tab instead
     const intentedCodes = new Set<string>();
     const recentIntents: OrchestratorIntent[] = [];
     for (const intent of allIntents) {
       if (intent.sourceSignal === 'manual_ui') {
         const ic = (intent.context as Record<string, unknown>)?.industryCode as string | undefined;
         if (ic) {
-          if (
-            ['proposed', 'approved', 'executing', 'simulating', 'completed'].includes(intent.status)
-          ) {
+          if (['proposed', 'approved', 'executing', 'simulating'].includes(intent.status)) {
             intentedCodes.add(ic);
             recentIntents.push(intent);
+          }
+          // Still track completed codes to avoid re-suggesting them
+          if (intent.status === 'completed') {
+            intentedCodes.add(ic);
           }
         }
       }
@@ -1144,10 +1240,12 @@ function useExpandSystemItems(scoped: ScopedIntelligence): ExpandSystemItem[] {
       items.push({ type: 'tracking', intent });
     }
 
-    // Build suggestions for un-actioned industries
+    // Build suggestions for un-actioned items — full hierarchy depth
     const suggestions: ProactiveSuggestion[] = [];
 
+    // ── GLOBAL / INDUSTRY level ──────────────────────────────────────────
     if (scoped.altitude === 'GLOBAL' || scoped.altitude === 'INDUSTRY') {
+      // Use case coverage gaps
       const coveredCodes = new Set(useCases.flatMap((uc) => uc.industryScope ?? []));
       const uncovered = industries
         .filter((i) => !coveredCodes.has(i.code) && !intentedCodes.has(i.code))
@@ -1162,6 +1260,7 @@ function useExpandSystemItems(scoped: ScopedIntelligence): ExpandSystemItem[] {
         });
       }
 
+      // Agent variant gaps
       const variantCodes = new Set(variants.map((v) => v.industryCode).filter(Boolean));
       const noVariant = industries
         .filter(
@@ -1180,44 +1279,235 @@ function useExpandSystemItems(scoped: ScopedIntelligence): ExpandSystemItem[] {
           context: { industryCode: ind.code, sector: ind.sector },
         });
       }
+
+      // Suggest new industries from missing macro-sectors (GLOBAL only)
+      if (scoped.altitude === 'GLOBAL') {
+        const loadedSectors = new Set(industries.map((i) => i.sector));
+        const missingSectors = MACRO_SECTORS.filter(
+          (ms) => ms.id !== 'other' && !ms.sectorCodes.some((code) => loadedSectors.has(code)),
+        );
+        for (const ms of missingSectors.slice(0, 2)) {
+          suggestions.push({
+            label: `Expand into ${ms.label}`,
+            description: `No industries loaded in ${ms.label} sector`,
+            intentType: 'expansion_opportunity',
+            priority: 'medium',
+            context: { sectorId: ms.id, sectorCodes: ms.sectorCodes },
+          });
+        }
+      }
+
+      // Hierarchy depth: variants needing deployment
+      const undeployedVariants = variants
+        .filter(
+          (v) =>
+            (!v.deployments || v.deployments.length === 0) && v.certificationStatus !== 'expired',
+        )
+        .slice(0, 1);
+      for (const v of undeployedVariants) {
+        suggestions.push({
+          label: `Deploy ${v.name}`,
+          description: 'Agent variant exists but has no active deployments',
+          intentType: 'expansion_opportunity',
+          priority: 'medium',
+          context: { variantId: v.id, skeletonId: v.skeletonId, industryCode: v.industryCode },
+        });
+      }
+
+      // Hierarchy depth: variants needing certification
+      const needsCert = variants
+        .filter(
+          (v) => v.certificationStatus === 'pending' || v.certificationStatus === 'uncertified',
+        )
+        .slice(0, 1);
+      for (const v of needsCert) {
+        suggestions.push({
+          label: `Certify ${v.name}`,
+          description: 'Agent variant needs certification before production deployment',
+          intentType: 'certification_renewal',
+          priority: 'high',
+          context: { variantId: v.id, skeletonId: v.skeletonId },
+        });
+      }
+
+      // Hierarchy depth: certified agents not on marketplace
+      const marketplaceReady = variants
+        .filter(
+          (v) => v.certificationStatus === 'certified' && v.deployments && v.deployments.length > 0,
+        )
+        .slice(0, 1);
+      for (const v of marketplaceReady) {
+        suggestions.push({
+          label: `List ${v.name} on marketplace`,
+          description: 'Fully certified and deployed — ready for cross-industry adoption',
+          intentType: 'marketplace_submission',
+          priority: 'low',
+          context: { variantId: v.id },
+        });
+      }
     }
 
+    // ── USE_CASE level ───────────────────────────────────────────────────
     if (scoped.altitude === 'USE_CASE' && scoped.altitudeContext.useCaseId) {
+      const ucId = scoped.altitudeContext.useCaseId;
+      // Find variants whose skeleton solves this UC via ontology
+      const ucVariants = variants.filter((v) =>
+        ontologyRelationships.some(
+          (r) =>
+            r.relationshipType === 'SOLVES' &&
+            ((r.subjectId === v.skeletonId && r.objectId === ucId) ||
+              (r.objectId === v.skeletonId && r.subjectId === ucId)),
+        ),
+      );
+
+      if (ucVariants.length === 0) {
+        suggestions.push({
+          label: 'Create agent for this use case',
+          description: 'No agent stacks solve this use case yet',
+          intentType: 'gap_coverage',
+          priority: 'high',
+          context: { useCaseId: ucId },
+        });
+      } else {
+        const undeployed = ucVariants.filter((v) => !v.deployments || v.deployments.length === 0);
+        if (undeployed.length > 0) {
+          suggestions.push({
+            label: `Deploy ${undeployed[0].name}`,
+            description: 'Agent exists but has no deployments',
+            intentType: 'expansion_opportunity',
+            priority: 'medium',
+            context: { variantId: undeployed[0].id, useCaseId: ucId },
+          });
+        }
+        const uncertified = ucVariants.filter((v) => v.certificationStatus !== 'certified');
+        if (uncertified.length > 0) {
+          suggestions.push({
+            label: `Certify ${uncertified[0].name}`,
+            description: 'Agent needs certification',
+            intentType: 'certification_renewal',
+            priority: 'high',
+            context: { variantId: uncertified[0].id },
+          });
+        }
+      }
       suggestions.push({
         label: 'Expand to more industries',
         description: 'Deploy this use case to additional industry verticals',
         intentType: 'expansion_opportunity',
         priority: 'medium',
-        context: { useCaseId: scoped.altitudeContext.useCaseId },
+        context: { useCaseId: ucId },
       });
     }
 
+    // ── STACK level ──────────────────────────────────────────────────────
     if (scoped.altitude === 'STACK' && scoped.altitudeContext.skeletonId) {
-      suggestions.push({
-        label: 'Deploy to production',
-        description: 'Deploy this agent stack to a production environment',
-        intentType: 'expansion_opportunity',
-        priority: 'medium',
-        context: { skeletonId: scoped.altitudeContext.skeletonId },
-      });
-    }
+      const skId = scoped.altitudeContext.skeletonId;
+      const stackVariants = variants.filter((v) => v.skeletonId === skId);
+      const undeployed = stackVariants.filter((v) => !v.deployments || v.deployments.length === 0);
+      const uncertified = stackVariants.filter((v) => v.certificationStatus !== 'certified');
 
-    if (scoped.altitude === 'AGENT' && scoped.altitudeContext.variantId) {
+      if (undeployed.length > 0) {
+        suggestions.push({
+          label: `Deploy ${undeployed[0].name}`,
+          description: 'Deploy this variant to production',
+          intentType: 'expansion_opportunity',
+          priority: 'medium',
+          context: { variantId: undeployed[0].id, skeletonId: skId },
+        });
+      }
+      if (uncertified.length > 0) {
+        suggestions.push({
+          label: `Certify ${uncertified[0].name}`,
+          description: 'Complete certification for this variant',
+          intentType: 'certification_renewal',
+          priority: 'high',
+          context: { variantId: uncertified[0].id, skeletonId: skId },
+        });
+      }
       suggestions.push({
         label: 'Submit to marketplace',
-        description: 'Publish this agent for cross-industry adoption',
+        description: 'Publish this agent stack for cross-industry adoption',
         intentType: 'marketplace_submission',
         priority: 'medium',
-        context: { variantId: scoped.altitudeContext.variantId },
+        context: { skeletonId: skId },
       });
     }
 
-    for (const s of suggestions.slice(0, 3)) {
+    // ── AGENT level ──────────────────────────────────────────────────────
+    if (scoped.altitude === 'AGENT' && scoped.altitudeContext.variantId) {
+      const v = variants.find((vr) => vr.id === scoped.altitudeContext.variantId);
+      if (v) {
+        if (!v.deployments || v.deployments.length === 0) {
+          suggestions.push({
+            label: 'Deploy to production',
+            description: 'Create a production deployment for this agent',
+            intentType: 'expansion_opportunity',
+            priority: 'high',
+            context: { variantId: v.id },
+          });
+        }
+        if (v.certificationStatus !== 'certified') {
+          suggestions.push({
+            label: 'Start certification',
+            description: 'Begin the certification process for this agent',
+            intentType: 'certification_renewal',
+            priority: 'high',
+            context: { variantId: v.id },
+          });
+        }
+        suggestions.push({
+          label: 'Submit to marketplace',
+          description: 'Publish this agent for cross-industry adoption',
+          intentType: 'marketplace_submission',
+          priority: 'medium',
+          context: { variantId: v.id },
+        });
+      }
+    }
+
+    // ── Always-on fallback — system always suggests betterment ──────────
+    if (suggestions.length === 0) {
+      if (scoped.altitude === 'GLOBAL') {
+        suggestions.push({
+          label: 'Review system health',
+          description: 'Run a comprehensive scan to find new optimization opportunities',
+          intentType: 'gap_coverage',
+          priority: 'low',
+          context: { scanType: 'full' },
+        });
+        suggestions.push({
+          label: 'Explore new verticals',
+          description: 'Identify industries adjacent to your current coverage for expansion',
+          intentType: 'expansion_opportunity',
+          priority: 'low',
+          context: { scanType: 'expansion' },
+        });
+      } else {
+        suggestions.push({
+          label: 'Optimize current coverage',
+          description:
+            'Look for improvements — better certifications, new deployments, or marketplace opportunities',
+          intentType: 'expansion_opportunity',
+          priority: 'low',
+          context: { ...scoped.altitudeContext },
+        });
+      }
+    }
+
+    for (const s of suggestions.slice(0, 5)) {
       items.push({ type: 'suggestion', suggestion: s });
     }
 
     return items;
-  }, [scoped.altitude, scoped.altitudeContext, useCases, industries, variants, allIntents]);
+  }, [
+    scoped.altitude,
+    scoped.altitudeContext,
+    useCases,
+    industries,
+    variants,
+    allIntents,
+    ontologyRelationships,
+  ]);
 }
 
 function ExpandSystemSection({
@@ -1312,7 +1602,9 @@ function OpportunitiesTab({
   const hasContent = suggestions.length > 0 || expansions.length > 0 || expandItems.length > 0;
 
   if (!hasContent) {
-    return <EmptyTab message="No opportunities at this level." />;
+    return (
+      <EmptyTab message="All opportunities are being pursued. The system is fully optimized." />
+    );
   }
 
   return (

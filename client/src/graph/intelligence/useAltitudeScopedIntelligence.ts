@@ -208,9 +208,43 @@ export function useAltitudeScopedIntelligence(): ScopedIntelligence {
       isGovernance,
     );
 
-    // -- Risk alerts (violations) --
+    // -- Risk alerts (violations) — scoped by altitude context --
     const unresolvedViolations = violations.filter((v) => !v.resolved);
-    const riskAlerts = unresolvedViolations;
+    let riskAlerts: GuardrailViolation[];
+    let riskAlertsFallback = false;
+
+    if (altitude === 'GLOBAL' && !sectorIndustryCodes) {
+      riskAlerts = unresolvedViolations;
+    } else {
+      const getDetails = (v: GuardrailViolation) =>
+        (v.violationDetails ?? {}) as Record<string, unknown>;
+      const scopedViolations = unresolvedViolations.filter((v) => {
+        const d = getDetails(v);
+        if (ctx.variantId && (d.variantId === ctx.variantId || d.agentVariantId === ctx.variantId))
+          return true;
+        if (
+          ctx.skeletonId &&
+          (d.skeletonId === ctx.skeletonId || d.agentStackId === ctx.skeletonId)
+        )
+          return true;
+        if (ctx.useCaseId && d.useCaseId === ctx.useCaseId) return true;
+        if (ctx.industryCode && d.industryCode === ctx.industryCode) return true;
+        if (sectorIndustryCodes) {
+          const ic = d.industryCode as string | undefined;
+          if (ic && sectorIndustryCodes.has(ic)) return true;
+        }
+        // Violations without context data: include only at GLOBAL level
+        const hasCtx =
+          d.variantId || d.agentVariantId || d.skeletonId || d.useCaseId || d.industryCode;
+        return !hasCtx && altitude === 'GLOBAL';
+      });
+      if (scopedViolations.length > 0) {
+        riskAlerts = scopedViolations;
+      } else {
+        riskAlerts = unresolvedViolations;
+        riskAlertsFallback = true;
+      }
+    }
 
     // -- Governance variants --
     const scopedVars = scopeVariants(
@@ -240,7 +274,8 @@ export function useAltitudeScopedIntelligence(): ScopedIntelligence {
     }
 
     // -- Scope note --
-    const hasFallback = sugResult.fallback || expResult.fallback || govResult.fallback;
+    const hasFallback =
+      sugResult.fallback || expResult.fallback || govResult.fallback || riskAlertsFallback;
     const scopeNote = hasFallback ? 'Showing all — no context-specific data found' : null;
 
     // -- Total alert count --
