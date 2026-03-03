@@ -11,7 +11,12 @@ import {
   closeAgentBrain,
   type ChatMessage,
 } from '../state/graphSlice';
-import { approveIntent, rejectIntent, resolveViolation } from '../../store/orchestratorSlice';
+import {
+  approveIntent,
+  rejectIntent,
+  resolveViolation,
+  createManualIntent,
+} from '../../store/orchestratorSlice';
 import type { SPIResult, SPIBreakdown } from '../intelligence/spiEngine';
 import type { OrchestratorIntent, GuardrailViolation } from '../../types/orchestrator';
 import type { AgentVariant } from '../../types/compliance';
@@ -143,6 +148,46 @@ export function AgentBrainPanel() {
     [submitQuestion],
   );
 
+  // Map SPI breakdown dominant factor to real intent types
+  const handleTakeAction = useCallback(
+    (result: SPIResult) => {
+      const SPI_INTENT_MAP: Record<string, { intentType: string; priority: string }> = {
+        coverageGapScore: { intentType: 'gap_coverage', priority: 'high' },
+        certWeaknessScore: { intentType: 'certification_renewal', priority: 'high' },
+        riskExposureScore: { intentType: 'risk_mitigation', priority: 'critical' },
+        revenueProxyScore: { intentType: 'marketplace_submission', priority: 'medium' },
+        volatilityScore: { intentType: 'drift_remediation', priority: 'medium' },
+        agentSaturationScore: { intentType: 'expansion_opportunity', priority: 'medium' },
+      };
+
+      // Find dominant breakdown factor
+      let maxKey: keyof SPIBreakdown = 'coverageGapScore';
+      let maxVal = -1;
+      for (const key of Object.keys(result.breakdown) as (keyof SPIBreakdown)[]) {
+        if (result.breakdown[key] > maxVal) {
+          maxVal = result.breakdown[key];
+          maxKey = key;
+        }
+      }
+
+      const mapping = SPI_INTENT_MAP[maxKey] ?? { intentType: 'gap_coverage', priority: 'medium' };
+      dispatch(
+        createManualIntent({
+          intentType: mapping.intentType,
+          title: `${result.recommendedAction} — ${result.title}`,
+          description: `SPI Score: ${result.spiScore}, Rank: #${result.rank}, Dominant factor: ${BREAKDOWN_LABELS[maxKey]?.label ?? maxKey}`,
+          context: {
+            industryCode: result.industryCode,
+            sector: result.sector,
+            spiScore: result.spiScore,
+          },
+          priority: mapping.priority,
+        }),
+      );
+    },
+    [dispatch],
+  );
+
   // Check whether current tab has content to show description
   const showDescription =
     activeTab !== 'askAi' && TAB_DESCRIPTIONS[activeTab] && tabCounts[activeTab] > 0;
@@ -242,7 +287,7 @@ export function AgentBrainPanel() {
         {/* Tab content — scrollbar hidden */}
         <div className="flex-1 overflow-y-auto scrollbar-none px-4 py-3">
           {activeTab === 'insights' && (
-            <InsightsTab scoped={scoped} onTakeAction={submitQuestion} />
+            <InsightsTab scoped={scoped} onTakeAction={handleTakeAction} />
           )}
           {activeTab === 'alerts' && (
             <AlertsTab
@@ -290,7 +335,7 @@ function InsightsTab({
   onTakeAction,
 }: {
   scoped: ScopedIntelligence;
-  onTakeAction: (action: string) => void;
+  onTakeAction: (result: SPIResult) => void;
 }) {
   const { spiInsights } = scoped;
 
@@ -323,8 +368,16 @@ function SPICard({
   onTakeAction,
 }: {
   result: SPIResult;
-  onTakeAction: (action: string) => void;
+  onTakeAction: (result: SPIResult) => void;
 }) {
+  const [created, setCreated] = useState(false);
+
+  const handleClick = () => {
+    onTakeAction(result);
+    setCreated(true);
+    setTimeout(() => setCreated(false), 2000);
+  };
+
   return (
     <div className="px-3 py-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)]">
       <div className="flex items-center justify-between mb-1">
@@ -354,11 +407,22 @@ function SPICard({
       </div>
 
       <button
-        onClick={() => onTakeAction(result.recommendedAction)}
-        className="w-full text-left text-[10px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer"
+        onClick={handleClick}
+        disabled={created}
+        className={`w-full text-left text-[10px] transition-colors cursor-pointer ${
+          created
+            ? 'text-emerald-500 dark:text-emerald-300 font-semibold'
+            : 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300'
+        }`}
       >
-        <span className="font-medium">Action:</span>{' '}
-        <span className="italic">{result.recommendedAction}</span>
+        {created ? (
+          'Intent created — view in Alerts tab'
+        ) : (
+          <>
+            <span className="font-medium">Action:</span>{' '}
+            <span className="italic">{result.recommendedAction}</span>
+          </>
+        )}
       </button>
     </div>
   );
@@ -369,7 +433,7 @@ function IndustryDetailView({
   onTakeAction,
 }: {
   result: SPIResult;
-  onTakeAction: (action: string) => void;
+  onTakeAction: (result: SPIResult) => void;
 }) {
   const dominantKey = useMemo(() => {
     let maxKey: keyof SPIBreakdown = 'coverageGapScore';
@@ -429,12 +493,47 @@ function IndustryDetailView({
       <KPICorrelation result={result} dominantKey={dominantKey} />
 
       {/* Actionable recommended action */}
-      <button
-        onClick={() => onTakeAction(result.recommendedAction)}
-        className="w-full px-3 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-left group"
-      >
-        <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5 flex items-center gap-1.5">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
+      <ActionButton result={result} onTakeAction={onTakeAction} />
+    </div>
+  );
+}
+
+function ActionButton({
+  result,
+  onTakeAction,
+}: {
+  result: SPIResult;
+  onTakeAction: (result: SPIResult) => void;
+}) {
+  const [created, setCreated] = useState(false);
+
+  const handleClick = () => {
+    onTakeAction(result);
+    setCreated(true);
+    setTimeout(() => setCreated(false), 3000);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={created}
+      className={`w-full px-3 py-2.5 rounded-lg border transition-colors text-left group ${
+        created
+          ? 'bg-emerald-500/20 border-emerald-500/30'
+          : 'bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/20'
+      }`}
+    >
+      <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5 flex items-center gap-1.5">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
+          {created ? (
+            <path
+              d="M2 6l3 3 5-6"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : (
             <path
               d="M1 6h10M7 2l4 4-4 4"
               stroke="currentColor"
@@ -442,14 +541,14 @@ function IndustryDetailView({
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-          </svg>
-          Take Action
-        </div>
-        <div className="text-[11px] text-[var(--text-primary)] group-hover:text-emerald-700 dark:group-hover:text-emerald-200 transition-colors">
-          {result.recommendedAction}
-        </div>
-      </button>
-    </div>
+          )}
+        </svg>
+        {created ? 'Intent Created' : 'Take Action'}
+      </div>
+      <div className="text-[11px] text-[var(--text-primary)] group-hover:text-emerald-700 dark:group-hover:text-emerald-200 transition-colors">
+        {created ? 'Visible in Orchestrator — status: proposed' : result.recommendedAction}
+      </div>
+    </button>
   );
 }
 

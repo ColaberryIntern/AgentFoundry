@@ -248,6 +248,27 @@ export const resolveViolation = createAsyncThunk(
   },
 );
 
+export const createManualIntent = createAsyncThunk(
+  'orchestrator/createManualIntent',
+  async (
+    data: {
+      intentType: string;
+      title: string;
+      description?: string;
+      context?: Record<string, unknown>;
+      priority?: string;
+    },
+    { rejectWithValue },
+  ) => {
+    try {
+      const response = await orchestratorApi.createIntent(data);
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(extractErrorMessage(err, 'Failed to create intent'));
+    }
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Slice
 // ---------------------------------------------------------------------------
@@ -454,6 +475,16 @@ const orchestratorSlice = createSlice({
         if (idx >= 0) state.violations[idx] = updated;
       })
       .addCase(resolveViolation.rejected, (state, action) => {
+        state.error = action.payload as string;
+      });
+
+    // Create Manual Intent
+    builder
+      .addCase(createManualIntent.fulfilled, (state, action) => {
+        const intent = action.payload?.data;
+        if (intent) state.intents.unshift(intent);
+      })
+      .addCase(createManualIntent.rejected, (state, action) => {
         state.error = action.payload as string;
       });
   },

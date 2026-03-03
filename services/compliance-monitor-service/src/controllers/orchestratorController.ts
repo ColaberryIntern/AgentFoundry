@@ -116,6 +116,28 @@ export async function getIntents(req: Request, res: Response) {
   }
 }
 
+export async function createIntent(req: Request, res: Response) {
+  try {
+    const { intentType, title, description, context, priority } = req.body;
+    if (!intentType || !title) {
+      return res.status(400).json({ error: { message: 'intentType and title are required' } });
+    }
+    const intent = await OrchestratorIntent.create({
+      intentType,
+      sourceSignal: 'manual_ui',
+      priority: priority || 'medium',
+      confidenceScore: 1.0,
+      title,
+      description: description || null,
+      context: context || null,
+      status: 'proposed',
+    });
+    res.status(201).json({ data: intent });
+  } catch (err) {
+    res.status(500).json({ error: { message: (err as Error).message } });
+  }
+}
+
 export async function getIntentById(req: Request, res: Response) {
   try {
     const intent = await OrchestratorIntent.findByPk(req.params.id, {

@@ -31,6 +31,14 @@ export const orchestratorApi = {
       `/registry/orchestrator/intents/${id}`,
     ),
 
+  createIntent: (data: {
+    intentType: string;
+    title: string;
+    description?: string;
+    context?: Record<string, unknown>;
+    priority?: string;
+  }) => api.post<{ data: OrchestratorIntent }>('/registry/orchestrator/intents', data),
+
   approveIntent: (id: string, data?: { reason?: string }) =>
     api.post<{ data: OrchestratorIntent }>(`/registry/orchestrator/intents/${id}/approve`, data),
 

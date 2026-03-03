@@ -3,6 +3,7 @@ import { authenticate } from '../middleware/auth';
 import {
   getDashboard,
   getIntents,
+  createIntent,
   getIntentById,
   approveIntent,
   rejectIntent,
@@ -28,6 +29,7 @@ router.get('/dashboard', authenticate, getDashboard);
 
 // Intents
 router.get('/intents', authenticate, getIntents);
+router.post('/intents', authenticate, createIntent);
 router.get('/intents/:id', authenticate, getIntentById);
 router.post('/intents/:id/approve', authenticate, approveIntent);
 router.post('/intents/:id/reject', authenticate, rejectIntent);
