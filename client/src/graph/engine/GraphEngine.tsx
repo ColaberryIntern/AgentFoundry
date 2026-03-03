@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
-  MiniMap,
   Controls,
   Background,
   BackgroundVariant,
@@ -84,21 +83,6 @@ const nodeTypes = {
 const edgeTypes = {
   hierarchicalEdge: HierarchicalEdge,
   semanticEdge: SemanticEdge,
-};
-
-// MiniMap color mapping
-const miniMapColorMap: Record<string, string> = {
-  industry: '#3b82f6',
-  useCase: '#f59e0b',
-  skeleton: '#a855f7',
-  variant: '#06b6d4',
-  certification: '#10b981',
-  deployment: '#6366f1',
-  risk: '#ef4444',
-  marketplace: '#ec4899',
-  industryCluster: '#3b82f6',
-  useCaseCluster: '#f59e0b',
-  stackCluster: '#a855f7',
 };
 
 function GraphEngineInner() {
@@ -353,15 +337,6 @@ function GraphEngineInner() {
         <Controls
           position="bottom-left"
           className="!bg-[var(--surface-primary)]/80 !backdrop-blur-xl !border-white/10 !rounded-lg !shadow-lg [&>button]:!bg-transparent [&>button]:!border-white/5 [&>button]:!text-[var(--text-muted)] [&>button:hover]:!bg-white/5"
-        />
-        <MiniMap
-          position="bottom-right"
-          className="!bg-[var(--surface-primary)]/80 !backdrop-blur-xl !border-white/10 !rounded-lg"
-          nodeColor={(node) => {
-            const type = getNodeTypeFromId(node.id);
-            return miniMapColorMap[type ?? ''] ?? '#6b7280';
-          }}
-          maskColor="rgba(0,0,0,0.6)"
         />
       </ReactFlow>
 

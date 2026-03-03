@@ -1,8 +1,16 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { useAltitudeScopedIntelligence } from '../intelligence/useAltitudeScopedIntelligence';
+import {
+  useAltitudeScopedIntelligence,
+  type ScopedIntelligence,
+} from '../intelligence/useAltitudeScopedIntelligence';
 import { generateChatResponse } from '../intelligence/chatEngine';
-import { addChatMessage, closeAgentBrain, type ChatMessage } from '../state/graphSlice';
+import {
+  addChatMessage,
+  clearChatMessages,
+  closeAgentBrain,
+  type ChatMessage,
+} from '../state/graphSlice';
 import type { SPIResult, SPIBreakdown } from '../intelligence/spiEngine';
 import type { OrchestratorIntent, GuardrailViolation } from '../../types/orchestrator';
 import type { AgentVariant } from '../../types/compliance';
@@ -34,13 +42,19 @@ const ALTITUDE_SHORT: Record<string, string> = {
 
 /**
  * Redesigned Agent Intelligence panel with 4 tabs, altitude-scoped content, and chat.
- * Pulls all data from useAltitudeScopedIntelligence instead of raw Redux selectors.
+ * Resets on altitude change. Shows smart suggested questions in Ask AI tab.
  */
 export function AgentBrainPanel() {
   const dispatch = useAppDispatch();
   const [activeTab, setActiveTab] = useState<BrainTab>('insights');
   const scoped = useAltitudeScopedIntelligence();
   const chatMessages = useAppSelector((s) => s.graph.chatMessages);
+
+  // Reset panel on altitude change
+  useEffect(() => {
+    setActiveTab('insights');
+    dispatch(clearChatMessages());
+  }, [scoped.altitude, dispatch]);
 
   const altColor = ALTITUDE_COLORS[scoped.altitude] ?? '#6366f1';
   const altLabel = ALTITUDE_SHORT[scoped.altitude] ?? 'Global';
@@ -60,6 +74,33 @@ export function AgentBrainPanel() {
     opportunities: opCount,
     askAi: chatMessages.length,
   };
+
+  // Submit a question programmatically (used by suggested questions)
+  const submitQuestion = useCallback(
+    (question: string) => {
+      const userMsg: ChatMessage = {
+        id: `chat-${Date.now()}-u`,
+        role: 'user',
+        content: question,
+        timestamp: Date.now(),
+        altitude: scoped.altitude,
+      };
+      dispatch(addChatMessage(userMsg));
+
+      const response = generateChatResponse(question, scoped.altitude, scoped);
+      const assistantMsg: ChatMessage = {
+        id: `chat-${Date.now()}-a`,
+        role: 'assistant',
+        content: response,
+        timestamp: Date.now(),
+        altitude: scoped.altitude,
+      };
+      dispatch(addChatMessage(assistantMsg));
+
+      setActiveTab('askAi');
+    },
+    [scoped, dispatch],
+  );
 
   return (
     <div className="absolute top-0 right-0 bottom-0 w-[380px] z-50 animate-slide-in">
@@ -85,15 +126,13 @@ export function AgentBrainPanel() {
                 </svg>
               </div>
               <div>
-                <h3 className="text-[12px] font-semibold text-[var(--text-primary)]">
-                  Intelligence
-                </h3>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Intelligence</h3>
               </div>
             </div>
             <div className="flex items-center gap-2">
               {/* Altitude context chip */}
               <div
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
                 style={{
                   backgroundColor: `${altColor}15`,
                   border: `1px solid ${altColor}30`,
@@ -120,7 +159,7 @@ export function AgentBrainPanel() {
           </div>
 
           {/* Context label */}
-          <div className="text-[9px] text-[var(--text-muted)] mt-1 truncate">
+          <div className="text-[11px] text-[var(--text-muted)] mt-1 truncate">
             {scoped.contextLabel}
             {scoped.scopeNote && (
               <span className="ml-1 text-amber-400/80 italic"> — {scoped.scopeNote}</span>
@@ -133,7 +172,7 @@ export function AgentBrainPanel() {
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-1 px-2.5 py-1 text-[9px] font-medium rounded-md whitespace-nowrap transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors ${
                   activeTab === key
                     ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                     : 'text-[var(--text-muted)] hover:bg-white/5 border border-transparent'
@@ -141,7 +180,7 @@ export function AgentBrainPanel() {
               >
                 {label}
                 {tabCounts[key] > 0 && (
-                  <span className="min-w-[14px] h-3.5 px-1 rounded-full bg-indigo-500/30 text-indigo-300 text-[8px] font-bold flex items-center justify-center">
+                  <span className="min-w-[14px] h-3.5 px-1 rounded-full bg-indigo-500/30 text-indigo-300 text-[9px] font-bold flex items-center justify-center">
                     {tabCounts[key]}
                   </span>
                 )}
@@ -155,7 +194,9 @@ export function AgentBrainPanel() {
           {activeTab === 'insights' && <InsightsTab scoped={scoped} />}
           {activeTab === 'alerts' && <AlertsTab scoped={scoped} />}
           {activeTab === 'opportunities' && <OpportunitiesTab scoped={scoped} />}
-          {activeTab === 'askAi' && <AskAITab messages={chatMessages} />}
+          {activeTab === 'askAi' && (
+            <AskAITab messages={chatMessages} scoped={scoped} onAskQuestion={submitQuestion} />
+          )}
         </div>
 
         {/* Chat input — always visible */}
@@ -178,7 +219,7 @@ const BREAKDOWN_LABELS: Record<keyof SPIBreakdown, { label: string; color: strin
   agentSaturationScore: { label: 'Agent Gap', color: '#06b6d4' },
 };
 
-function InsightsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedIntelligence> }) {
+function InsightsTab({ scoped }: { scoped: ScopedIntelligence }) {
   const { spiInsights, contextLabel } = scoped;
 
   if (!spiInsights) {
@@ -197,7 +238,7 @@ function InsightsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedIn
 
   return (
     <div className="space-y-3">
-      <div className="text-[10px] font-semibold text-[var(--text-primary)]">
+      <div className="text-xs font-semibold text-[var(--text-primary)]">
         Strategic Priorities — {contextLabel}
       </div>
       {spiInsights.map((result) => (
@@ -209,16 +250,14 @@ function InsightsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedIn
 
 function SPICard({ result }: { result: SPIResult }) {
   return (
-    <div className="px-3 py-2 rounded-lg bg-white/3 border border-white/5">
+    <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-medium text-[var(--text-primary)] truncate flex-1">
+        <span className="text-xs font-medium text-[var(--text-primary)] truncate flex-1">
           #{result.rank} {result.title}
         </span>
-        <span className="text-[10px] font-bold text-indigo-400 ml-2">
-          {result.spiScore.toFixed(0)}
-        </span>
+        <span className="text-xs font-bold text-indigo-400 ml-2">{result.spiScore.toFixed(0)}</span>
       </div>
-      <div className="text-[8px] text-[var(--text-muted)] mb-1.5">NAICS {result.industryCode}</div>
+      <div className="text-[10px] text-[var(--text-muted)] mb-1.5">NAICS {result.industryCode}</div>
 
       {/* Mini breakdown bar */}
       <div className="flex gap-0.5 h-1.5 mb-1.5 rounded-full overflow-hidden">
@@ -236,7 +275,7 @@ function SPICard({ result }: { result: SPIResult }) {
         ))}
       </div>
 
-      <div className="text-[8px] text-[var(--text-muted)] italic">{result.recommendedAction}</div>
+      <div className="text-[10px] text-[var(--text-muted)] italic">{result.recommendedAction}</div>
     </div>
   );
 }
@@ -244,15 +283,15 @@ function SPICard({ result }: { result: SPIResult }) {
 function IndustryDetailView({ result }: { result: SPIResult }) {
   return (
     <div className="space-y-3">
-      <div className="text-[10px] font-semibold text-[var(--text-primary)]">
+      <div className="text-xs font-semibold text-[var(--text-primary)]">
         {result.title} — SPI Analysis
       </div>
 
-      <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-        <div className="text-[24px] font-bold text-indigo-400">{result.spiScore.toFixed(0)}</div>
+      <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+        <div className="text-[28px] font-bold text-indigo-400">{result.spiScore.toFixed(0)}</div>
         <div>
-          <div className="text-[9px] text-[var(--text-muted)]">Strategic Priority Index</div>
-          <div className="text-[9px] text-[var(--text-primary)]">
+          <div className="text-[11px] text-[var(--text-muted)]">Strategic Priority Index</div>
+          <div className="text-[11px] text-[var(--text-primary)]">
             Global Rank #{result.rank} · NAICS {result.industryCode}
           </div>
         </div>
@@ -265,8 +304,8 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
           return (
             <div key={key}>
               <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[9px] text-[var(--text-muted)]">{label}</span>
-                <span className="text-[9px] font-bold" style={{ color }}>
+                <span className="text-[11px] text-[var(--text-muted)]">{label}</span>
+                <span className="text-[11px] font-bold" style={{ color }}>
                   {Math.round(score)}
                 </span>
               </div>
@@ -285,9 +324,9 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
         })}
       </div>
 
-      <div className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-        <div className="text-[9px] font-semibold text-emerald-400 mb-0.5">Recommended Action</div>
-        <div className="text-[9px] text-[var(--text-primary)]">{result.recommendedAction}</div>
+      <div className="px-3 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+        <div className="text-[11px] font-semibold text-emerald-400 mb-0.5">Recommended Action</div>
+        <div className="text-[11px] text-[var(--text-primary)]">{result.recommendedAction}</div>
       </div>
     </div>
   );
@@ -297,7 +336,7 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
 // Alerts Tab — Risk Alerts + Governance merged
 // ---------------------------------------------------------------------------
 
-function AlertsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedIntelligence> }) {
+function AlertsTab({ scoped }: { scoped: ScopedIntelligence }) {
   const { riskAlerts, governance } = scoped;
   const hasContent =
     riskAlerts.length > 0 ||
@@ -310,7 +349,6 @@ function AlertsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedInte
 
   return (
     <div className="space-y-4">
-      {/* Risk alerts */}
       {riskAlerts.length > 0 && (
         <Section title={`Risk Alerts (${riskAlerts.length})`}>
           {riskAlerts.map((v) => (
@@ -319,7 +357,6 @@ function AlertsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedInte
         </Section>
       )}
 
-      {/* Governance intents */}
       {governance.intents.length > 0 && (
         <Section title={`Governance Intents (${governance.intents.length})`}>
           {governance.intents.map((intent) => (
@@ -328,7 +365,6 @@ function AlertsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedInte
         </Section>
       )}
 
-      {/* Expiring variants */}
       {governance.expiringVariants.length > 0 && (
         <Section title={`Cert Attention (${governance.expiringVariants.length})`}>
           {governance.expiringVariants.slice(0, 10).map((v) => (
@@ -344,11 +380,7 @@ function AlertsTab({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedInte
 // Opportunities Tab — Suggestions + Expansion merged
 // ---------------------------------------------------------------------------
 
-function OpportunitiesTab({
-  scoped,
-}: {
-  scoped: ReturnType<typeof useAltitudeScopedIntelligence>;
-}) {
+function OpportunitiesTab({ scoped }: { scoped: ScopedIntelligence }) {
   const { suggestions, expansions } = scoped;
   const hasContent = suggestions.length > 0 || expansions.length > 0;
 
@@ -378,11 +410,46 @@ function OpportunitiesTab({
 }
 
 // ---------------------------------------------------------------------------
-// Ask AI Tab — Chat conversation
+// Ask AI Tab — Chat conversation + Smart suggested questions
 // ---------------------------------------------------------------------------
 
-function AskAITab({ messages }: { messages: ChatMessage[] }) {
+function useSuggestedQuestions(scoped: ScopedIntelligence): string[] {
+  return useMemo(() => {
+    const questions: string[] = [];
+    questions.push('Give me a summary of this level');
+
+    if (scoped.riskAlerts.length > 0) {
+      questions.push('What risks should I be aware of?');
+    }
+    if (scoped.suggestions.length > 0) {
+      questions.push('What do you recommend I do?');
+    }
+    if (scoped.governance.expiringVariants.length > 0) {
+      questions.push('Which certifications need attention?');
+    }
+    if (scoped.expansions.length > 0) {
+      questions.push('What expansion opportunities exist?');
+    }
+    if (scoped.spiInsights) {
+      questions.push('What are the strategic priorities?');
+    }
+
+    questions.push('Explain what I am looking at');
+    return questions;
+  }, [scoped]);
+}
+
+function AskAITab({
+  messages,
+  scoped,
+  onAskQuestion,
+}: {
+  messages: ChatMessage[];
+  scoped: ScopedIntelligence;
+  onAskQuestion: (q: string) => void;
+}) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const suggestedQuestions = useSuggestedQuestions(scoped);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -392,25 +459,42 @@ function AskAITab({ messages }: { messages: ChatMessage[] }) {
 
   if (messages.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-4">
-        <div className="w-12 h-12 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-3">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <circle cx="7.5" cy="8" r="1.5" fill="#6366f1" />
-            <circle cx="12.5" cy="8" r="1.5" fill="#6366f1" />
-            <path
-              d="M7 13c0 0 1.5 2 3 2s3-2 3-2"
-              stroke="#6366f1"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+      <div className="flex flex-col px-1">
+        {/* Header */}
+        <div className="flex items-center gap-2.5 mb-4 mt-1">
+          <div className="w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+              <circle cx="7.5" cy="8" r="1.5" fill="#6366f1" />
+              <circle cx="12.5" cy="8" r="1.5" fill="#6366f1" />
+              <path
+                d="M7 13c0 0 1.5 2 3 2s3-2 3-2"
+                stroke="#6366f1"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-[var(--text-primary)]">
+              Ask about {scoped.contextLabel}
+            </div>
+            <div className="text-[11px] text-[var(--text-muted)]">
+              Tap a question or type your own below
+            </div>
+          </div>
         </div>
-        <div className="text-[11px] font-medium text-[var(--text-primary)] mb-1">
-          Ask about this level
-        </div>
-        <div className="text-[9px] text-[var(--text-muted)] max-w-[220px]">
-          Ask about risks, suggestions, certifications, expansion opportunities, or SPI scores at
-          the current altitude.
+
+        {/* Suggested questions */}
+        <div className="space-y-2">
+          {suggestedQuestions.map((q) => (
+            <button
+              key={q}
+              onClick={() => onAskQuestion(q)}
+              className="w-full text-left px-3 py-2.5 rounded-lg bg-white/3 border border-white/5 text-xs text-[var(--text-primary)] hover:bg-indigo-500/10 hover:border-indigo-500/20 transition-colors"
+            >
+              {q}
+            </button>
+          ))}
         </div>
       </div>
     );
@@ -421,6 +505,22 @@ function AskAITab({ messages }: { messages: ChatMessage[] }) {
       {messages.map((msg) => (
         <ChatBubble key={msg.id} message={msg} />
       ))}
+
+      {/* Condensed suggestions after messages */}
+      <div className="pt-2 border-t border-white/5">
+        <div className="text-[10px] text-[var(--text-muted)] mb-1.5">More questions</div>
+        <div className="flex flex-wrap gap-1.5">
+          {suggestedQuestions.slice(0, 4).map((q) => (
+            <button
+              key={q}
+              onClick={() => onAskQuestion(q)}
+              className="px-2.5 py-1 rounded-full bg-white/3 border border-white/5 text-[10px] text-[var(--text-muted)] hover:bg-indigo-500/10 hover:text-indigo-400 hover:border-indigo-500/20 transition-colors"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -430,14 +530,14 @@ function ChatBubble({ message }: { message: ChatMessage }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] px-3 py-2 rounded-xl text-[10px] leading-relaxed ${
+        className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
           isUser
             ? 'bg-indigo-500/20 text-indigo-200 border border-indigo-500/20 rounded-br-sm'
             : 'bg-white/5 text-[var(--text-primary)] border border-white/5 rounded-bl-sm'
         }`}
       >
         <div className="whitespace-pre-wrap break-words">{message.content}</div>
-        <div className="text-[7px] text-[var(--text-muted)] mt-1 opacity-60">
+        <div className="text-[9px] text-[var(--text-muted)] mt-1 opacity-60">
           {ALTITUDE_SHORT[message.altitude] ?? message.altitude}
         </div>
       </div>
@@ -449,7 +549,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
 // Chat Input — always visible at bottom
 // ---------------------------------------------------------------------------
 
-function ChatInput({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedIntelligence> }) {
+function ChatInput({ scoped }: { scoped: ScopedIntelligence }) {
   const dispatch = useAppDispatch();
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -460,7 +560,6 @@ function ChatInput({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedInte
       const q = input.trim();
       if (!q) return;
 
-      // Add user message
       const userMsg: ChatMessage = {
         id: `chat-${Date.now()}-u`,
         role: 'user',
@@ -470,7 +569,6 @@ function ChatInput({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedInte
       };
       dispatch(addChatMessage(userMsg));
 
-      // Generate response
       const response = generateChatResponse(q, scoped.altitude, scoped);
       const assistantMsg: ChatMessage = {
         id: `chat-${Date.now()}-a`,
@@ -498,7 +596,7 @@ function ChatInput({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedInte
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={`Ask about ${scoped.contextLabel}...`}
-          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-indigo-500/40 transition-colors"
+          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-indigo-500/40 transition-colors"
         />
         <button
           type="submit"
@@ -527,7 +625,7 @@ function ChatInput({ scoped }: { scoped: ReturnType<typeof useAltitudeScopedInte
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[9px] text-[var(--text-muted)] font-medium mb-1.5">{title}</div>
+      <div className="text-[11px] text-[var(--text-muted)] font-medium mb-1.5">{title}</div>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -542,13 +640,13 @@ function IntentCard({ intent }: { intent: OrchestratorIntent }) {
   };
 
   return (
-    <div className="px-3 py-2 rounded-lg bg-white/3 border border-white/5">
+    <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-medium text-[var(--text-primary)] truncate flex-1">
+        <span className="text-xs font-medium text-[var(--text-primary)] truncate flex-1">
           {intent.title}
         </span>
         <span
-          className="text-[8px] font-bold px-1.5 py-0.5 rounded-full ml-2"
+          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-2"
           style={{
             backgroundColor: `${priorityColors[intent.priority] ?? '#6b7280'}20`,
             color: priorityColors[intent.priority] ?? '#6b7280',
@@ -557,7 +655,7 @@ function IntentCard({ intent }: { intent: OrchestratorIntent }) {
           {intent.priority}
         </span>
       </div>
-      <div className="flex items-center gap-2 text-[8px] text-[var(--text-muted)]">
+      <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)]">
         <span className="capitalize">{intent.intentType.replace(/_/g, ' ')}</span>
         <span>·</span>
         <span>{Math.round(intent.confidenceScore * 100)}% confidence</span>
@@ -570,13 +668,13 @@ function IntentCard({ intent }: { intent: OrchestratorIntent }) {
 
 function ViolationCard({ violation }: { violation: GuardrailViolation }) {
   return (
-    <div className="px-3 py-2 rounded-lg bg-white/3 border border-white/5">
+    <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-medium text-[var(--text-primary)] capitalize">
+        <span className="text-xs font-medium text-[var(--text-primary)] capitalize">
           {violation.guardrailType.replace(/_/g, ' ')}
         </span>
         <span
-          className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${
+          className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
             violation.severity === 'block'
               ? 'bg-red-500/20 text-red-400'
               : 'bg-amber-500/20 text-amber-400'
@@ -585,7 +683,7 @@ function ViolationCard({ violation }: { violation: GuardrailViolation }) {
           {violation.severity}
         </span>
       </div>
-      <div className="text-[9px] text-[var(--text-muted)]">
+      <div className="text-[11px] text-[var(--text-muted)]">
         {JSON.stringify(violation.violationDetails).slice(0, 80)}
       </div>
     </div>
@@ -594,12 +692,12 @@ function ViolationCard({ violation }: { violation: GuardrailViolation }) {
 
 function VariantCertCard({ variant }: { variant: AgentVariant }) {
   return (
-    <div className="flex items-center justify-between px-2 py-1.5 rounded-md bg-white/3">
-      <span className="text-[9px] text-[var(--text-primary)] truncate">
+    <div className="flex items-center justify-between px-3 py-2 rounded-md bg-white/3">
+      <span className="text-[11px] text-[var(--text-primary)] truncate">
         {variant.name ?? variant.id}
       </span>
       <span
-        className={`text-[8px] font-bold ${
+        className={`text-[10px] font-bold ${
           variant.certificationStatus === 'expired' ? 'text-red-400' : 'text-amber-400'
         }`}
       >
@@ -611,7 +709,7 @@ function VariantCertCard({ variant }: { variant: AgentVariant }) {
 
 function EmptyTab({ message }: { message: string }) {
   return (
-    <div className="flex items-center justify-center h-32 text-[10px] text-[var(--text-muted)]">
+    <div className="flex items-center justify-center h-32 text-xs text-[var(--text-muted)]">
       {message}
     </div>
   );
