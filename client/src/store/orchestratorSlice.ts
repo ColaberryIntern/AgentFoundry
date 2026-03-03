@@ -8,6 +8,8 @@ import type {
   GuardrailViolation,
   ScanLogEntry,
   MarketplaceSubmission,
+  IntentType,
+  Priority,
 } from '../types/orchestrator';
 import type { AxiosError } from 'axios';
 
@@ -38,6 +40,7 @@ interface OrchestratorState {
   error: string | null;
   _marketplaceBackup: MarketplaceSubmission[] | null;
   _dashboardBackup: OrchestratorDashboard | null;
+  _intentsBackup: OrchestratorIntent[] | null;
 }
 
 const initialState: OrchestratorState = {
@@ -63,6 +66,7 @@ const initialState: OrchestratorState = {
   error: null,
   _marketplaceBackup: null,
   _dashboardBackup: null,
+  _intentsBackup: null,
 };
 
 function extractErrorMessage(err: unknown, fallback: string): string {
@@ -283,6 +287,7 @@ const orchestratorSlice = createSlice({
     loadDemoMarketplace(state, action: PayloadAction<MarketplaceSubmission[]>) {
       state._marketplaceBackup = state.marketplace;
       state._dashboardBackup = state.dashboard;
+      state._intentsBackup = state.intents;
       state.marketplace = action.payload;
       state.marketplaceTotal = action.payload.length;
     },
@@ -293,8 +298,63 @@ const orchestratorSlice = createSlice({
       state.marketplace = state._marketplaceBackup ?? [];
       state.marketplaceTotal = state._marketplaceBackup?.length ?? 0;
       state.dashboard = state._dashboardBackup ?? null;
+      state.intents = state._intentsBackup ?? [];
+      state.intentsTotal = state._intentsBackup?.length ?? 0;
       state._marketplaceBackup = null;
       state._dashboardBackup = null;
+      state._intentsBackup = null;
+    },
+    addLocalIntent(
+      state,
+      action: PayloadAction<{
+        intentType: string;
+        title: string;
+        description?: string;
+        context?: Record<string, unknown>;
+        priority?: string;
+      }>,
+    ) {
+      const d = action.payload;
+      const intent: OrchestratorIntent = {
+        id: `local-${Date.now()}-${state.intents.length}`,
+        intentType: d.intentType as IntentType,
+        sourceSignal: 'manual_ui',
+        priority: (d.priority ?? 'medium') as Priority,
+        confidenceScore: 0.85,
+        title: d.title,
+        description: d.description ?? null,
+        context: d.context ?? null,
+        recommendedActions: null,
+        status: 'proposed',
+        resolvedBy: null,
+        resolvedAt: null,
+        expiresAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      state.intents.unshift(intent);
+    },
+    approveLocalIntent(state, action: PayloadAction<{ id: string }>) {
+      const idx = state.intents.findIndex((i) => i.id === action.payload.id);
+      if (idx >= 0) {
+        state.intents[idx] = {
+          ...state.intents[idx],
+          status: 'completed',
+          resolvedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    },
+    rejectLocalIntent(state, action: PayloadAction<{ id: string }>) {
+      const idx = state.intents.findIndex((i) => i.id === action.payload.id);
+      if (idx >= 0) {
+        state.intents[idx] = {
+          ...state.intents[idx],
+          status: 'rejected',
+          resolvedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
     },
   },
   extraReducers: (builder) => {
@@ -490,6 +550,13 @@ const orchestratorSlice = createSlice({
   },
 });
 
-export const { clearError, loadDemoMarketplace, loadDemoDashboard, restoreLiveOrchestrator } =
-  orchestratorSlice.actions;
+export const {
+  clearError,
+  loadDemoMarketplace,
+  loadDemoDashboard,
+  restoreLiveOrchestrator,
+  addLocalIntent,
+  approveLocalIntent,
+  rejectLocalIntent,
+} = orchestratorSlice.actions;
 export default orchestratorSlice.reducer;

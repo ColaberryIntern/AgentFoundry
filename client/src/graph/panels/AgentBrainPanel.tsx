@@ -17,8 +17,12 @@ import {
   resolveViolation,
   createManualIntent,
   fetchDashboard,
+  addLocalIntent,
+  approveLocalIntent,
+  rejectLocalIntent,
 } from '../../store/orchestratorSlice';
 import { fetchUseCases, fetchAgentVariants } from '../../store/registrySlice';
+import { fetchOntologyRelationships } from '../state/graphSlice';
 import type { SPIResult, SPIBreakdown } from '../intelligence/spiEngine';
 import type { OrchestratorIntent, GuardrailViolation } from '../../types/orchestrator';
 import type { AgentVariant } from '../../types/compliance';
@@ -69,6 +73,8 @@ export function AgentBrainPanel() {
   const scoped = useAltitudeScopedIntelligence();
   const chatMessages = useAppSelector((s) => s.graph.chatMessages);
   const allIntents = useAppSelector((s) => s.orchestrator.intents);
+  const demoMode =
+    useAppSelector((s) => (s.graph as unknown as { demoMode?: boolean }).demoMode) ?? false;
 
   // Reset panel on altitude change
   useEffect(() => {
@@ -125,21 +131,30 @@ export function AgentBrainPanel() {
   // Action callbacks wired to Redux thunks — re-fetch registry after approval
   const handleApproveIntent = useCallback(
     (id: string) => {
+      if (demoMode) {
+        dispatch(approveLocalIntent({ id }));
+        return;
+      }
       dispatch(approveIntent({ id })).then(() => {
-        // Refresh registry data to pick up newly created resources
+        // Refresh registry + ontology to update graph nodes and KPI strip
         dispatch(fetchUseCases({}));
         dispatch(fetchAgentVariants({}));
+        dispatch(fetchOntologyRelationships({ limit: 500 }));
         dispatch(fetchDashboard());
       });
     },
-    [dispatch],
+    [dispatch, demoMode],
   );
 
   const handleDismissIntent = useCallback(
     (id: string) => {
+      if (demoMode) {
+        dispatch(rejectLocalIntent({ id }));
+        return;
+      }
       dispatch(rejectIntent({ id, reason: 'Dismissed from Intelligence panel' }));
     },
-    [dispatch],
+    [dispatch, demoMode],
   );
 
   const handleResolveViolation = useCallback(
@@ -179,37 +194,43 @@ export function AgentBrainPanel() {
       }
 
       const mapping = SPI_INTENT_MAP[maxKey] ?? { intentType: 'gap_coverage', priority: 'medium' };
-      dispatch(
-        createManualIntent({
-          intentType: mapping.intentType,
-          title: `${result.recommendedAction} — ${result.title}`,
-          description: `SPI Score: ${result.spiScore}, Rank: #${result.rank}, Dominant factor: ${BREAKDOWN_LABELS[maxKey]?.label ?? maxKey}`,
-          context: {
-            industryCode: result.industryCode,
-            sector: result.sector,
-            spiScore: result.spiScore,
-          },
-          priority: mapping.priority,
-        }),
-      );
+      const intentData = {
+        intentType: mapping.intentType,
+        title: `${result.recommendedAction} — ${result.title}`,
+        description: `SPI Score: ${result.spiScore}, Rank: #${result.rank}, Dominant factor: ${BREAKDOWN_LABELS[maxKey]?.label ?? maxKey}`,
+        context: {
+          industryCode: result.industryCode,
+          sector: result.sector,
+          spiScore: result.spiScore,
+        },
+        priority: mapping.priority,
+      };
+      if (demoMode) {
+        dispatch(addLocalIntent(intentData));
+      } else {
+        dispatch(createManualIntent(intentData));
+      }
     },
-    [dispatch],
+    [dispatch, demoMode],
   );
 
   // Create intent from a proactive suggestion
   const handleCreateSuggestion = useCallback(
     (suggestion: ProactiveSuggestion) => {
-      dispatch(
-        createManualIntent({
-          intentType: suggestion.intentType,
-          title: suggestion.label,
-          description: suggestion.description,
-          context: suggestion.context,
-          priority: suggestion.priority,
-        }),
-      );
+      const intentData = {
+        intentType: suggestion.intentType,
+        title: suggestion.label,
+        description: suggestion.description,
+        context: suggestion.context,
+        priority: suggestion.priority,
+      };
+      if (demoMode) {
+        dispatch(addLocalIntent(intentData));
+      } else {
+        dispatch(createManualIntent(intentData));
+      }
     },
-    [dispatch],
+    [dispatch, demoMode],
   );
 
   // Check whether current tab has content to show description
@@ -378,7 +399,7 @@ function InsightsTab({
   intents: OrchestratorIntent[];
 }) {
   const { spiInsights } = scoped;
-  const proactive = useProactiveSuggestions(scoped);
+  const expandItems = useExpandSystemItems(scoped);
 
   // Build lookup: industryCode → most recent manual_ui intent
   const actionedMap = useMemo(() => {
@@ -442,7 +463,12 @@ function InsightsTab({
         );
       })}
 
-      <ProactiveSuggestions suggestions={proactive} onTakeAction={onCreateSuggestion} />
+      <ExpandSystemSection
+        items={expandItems}
+        onTakeAction={onCreateSuggestion}
+        onApproveIntent={onApproveIntent}
+        onDismissIntent={onDismissIntent}
+      />
     </div>
   );
 }
@@ -1072,7 +1098,7 @@ function ShowMoreButton({ count, onClick }: { count: number; onClick: () => void
 }
 
 // ---------------------------------------------------------------------------
-// Proactive Expansion Suggestions — always suggest next growth steps
+// Expand Your System — suggestions + full lifecycle tracking
 // ---------------------------------------------------------------------------
 
 interface ProactiveSuggestion {
@@ -1083,32 +1109,51 @@ interface ProactiveSuggestion {
   context: Record<string, unknown>;
 }
 
-function useProactiveSuggestions(scoped: ScopedIntelligence): ProactiveSuggestion[] {
+interface ExpandSystemItem {
+  type: 'tracking' | 'suggestion';
+  intent?: OrchestratorIntent;
+  suggestion?: ProactiveSuggestion;
+}
+
+function useExpandSystemItems(scoped: ScopedIntelligence): ExpandSystemItem[] {
   const { useCases, industries, variants } = useAppSelector((s) => s.registry);
   const allIntents = useAppSelector((s) => s.orchestrator.intents);
 
   return useMemo(() => {
-    const items: ProactiveSuggestion[] = [];
+    const items: ExpandSystemItem[] = [];
 
-    // Track industries that already have pending/active intents to avoid duplicates
+    // Collect manual_ui intents with their industry codes for tracking
     const intentedCodes = new Set<string>();
+    const recentIntents: OrchestratorIntent[] = [];
     for (const intent of allIntents) {
-      if (
-        ['proposed', 'approved', 'executing', 'simulating', 'completed'].includes(intent.status)
-      ) {
+      if (intent.sourceSignal === 'manual_ui') {
         const ic = (intent.context as Record<string, unknown>)?.industryCode as string | undefined;
-        if (ic) intentedCodes.add(ic);
+        if (ic) {
+          if (
+            ['proposed', 'approved', 'executing', 'simulating', 'completed'].includes(intent.status)
+          ) {
+            intentedCodes.add(ic);
+            recentIntents.push(intent);
+          }
+        }
       }
     }
 
+    // Show recently actioned intents as tracking cards (max 5)
+    for (const intent of recentIntents.slice(0, 5)) {
+      items.push({ type: 'tracking', intent });
+    }
+
+    // Build suggestions for un-actioned industries
+    const suggestions: ProactiveSuggestion[] = [];
+
     if (scoped.altitude === 'GLOBAL' || scoped.altitude === 'INDUSTRY') {
-      // Industries without use cases
       const coveredCodes = new Set(useCases.flatMap((uc) => uc.industryScope ?? []));
       const uncovered = industries
         .filter((i) => !coveredCodes.has(i.code) && !intentedCodes.has(i.code))
         .slice(0, 2);
       for (const ind of uncovered) {
-        items.push({
+        suggestions.push({
           label: `Add use case for ${ind.title}`,
           description: `NAICS ${ind.code} has no use case coverage`,
           intentType: 'gap_coverage',
@@ -1117,7 +1162,6 @@ function useProactiveSuggestions(scoped: ScopedIntelligence): ProactiveSuggestio
         });
       }
 
-      // Industries without agent variants
       const variantCodes = new Set(variants.map((v) => v.industryCode).filter(Boolean));
       const noVariant = industries
         .filter(
@@ -1128,7 +1172,7 @@ function useProactiveSuggestions(scoped: ScopedIntelligence): ProactiveSuggestio
         )
         .slice(0, 1);
       for (const ind of noVariant) {
-        items.push({
+        suggestions.push({
           label: `Deploy agent for ${ind.title}`,
           description: `No agent variant exists for NAICS ${ind.code}`,
           intentType: 'expansion_opportunity',
@@ -1139,7 +1183,7 @@ function useProactiveSuggestions(scoped: ScopedIntelligence): ProactiveSuggestio
     }
 
     if (scoped.altitude === 'USE_CASE' && scoped.altitudeContext.useCaseId) {
-      items.push({
+      suggestions.push({
         label: 'Expand to more industries',
         description: 'Deploy this use case to additional industry verticals',
         intentType: 'expansion_opportunity',
@@ -1149,7 +1193,7 @@ function useProactiveSuggestions(scoped: ScopedIntelligence): ProactiveSuggestio
     }
 
     if (scoped.altitude === 'STACK' && scoped.altitudeContext.skeletonId) {
-      items.push({
+      suggestions.push({
         label: 'Deploy to production',
         description: 'Deploy this agent stack to a production environment',
         intentType: 'expansion_opportunity',
@@ -1159,7 +1203,7 @@ function useProactiveSuggestions(scoped: ScopedIntelligence): ProactiveSuggestio
     }
 
     if (scoped.altitude === 'AGENT' && scoped.altitudeContext.variantId) {
-      items.push({
+      suggestions.push({
         label: 'Submit to marketplace',
         description: 'Publish this agent for cross-industry adoption',
         intentType: 'marketplace_submission',
@@ -1168,18 +1212,26 @@ function useProactiveSuggestions(scoped: ScopedIntelligence): ProactiveSuggestio
       });
     }
 
-    return items.slice(0, 3);
+    for (const s of suggestions.slice(0, 3)) {
+      items.push({ type: 'suggestion', suggestion: s });
+    }
+
+    return items;
   }, [scoped.altitude, scoped.altitudeContext, useCases, industries, variants, allIntents]);
 }
 
-function ProactiveSuggestions({
-  suggestions,
+function ExpandSystemSection({
+  items,
   onTakeAction,
+  onApproveIntent,
+  onDismissIntent,
 }: {
-  suggestions: ProactiveSuggestion[];
+  items: ExpandSystemItem[];
   onTakeAction: (s: ProactiveSuggestion) => void;
+  onApproveIntent: (id: string) => void;
+  onDismissIntent: (id: string) => void;
 }) {
-  if (suggestions.length === 0) return null;
+  if (items.length === 0) return null;
 
   return (
     <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
@@ -1187,36 +1239,54 @@ function ProactiveSuggestions({
         Expand Your System
       </div>
       <div className="space-y-1.5">
-        {suggestions.map((s, i) => (
-          <button
-            key={i}
-            onClick={() => onTakeAction(s)}
-            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:bg-[var(--surface-card-hover)] transition-colors text-left group"
-          >
-            <div className="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 12 12"
-                fill="none"
-                className="text-indigo-500"
+        {items.map((item, i) => {
+          if (item.type === 'tracking' && item.intent) {
+            return (
+              <InlineIntentStatus
+                key={item.intent.id}
+                intent={item.intent}
+                onApprove={onApproveIntent}
+                onDismiss={onDismissIntent}
+              />
+            );
+          }
+          if (item.type === 'suggestion' && item.suggestion) {
+            const s = item.suggestion;
+            return (
+              <button
+                key={`suggestion-${i}`}
+                onClick={() => onTakeAction(s)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:bg-[var(--surface-card-hover)] transition-colors text-left group"
               >
-                <path
-                  d="M6 2v8M2 6h8"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[11px] font-medium text-[var(--text-primary)] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
-                {s.label}
-              </div>
-              <div className="text-[10px] text-[var(--text-muted)] truncate">{s.description}</div>
-            </div>
-          </button>
-        ))}
+                <div className="w-5 h-5 rounded-full bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    className="text-indigo-500"
+                  >
+                    <path
+                      d="M6 2v8M2 6h8"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] font-medium text-[var(--text-primary)] group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
+                    {s.label}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-muted)] truncate">
+                    {s.description}
+                  </div>
+                </div>
+              </button>
+            );
+          }
+          return null;
+        })}
       </div>
     </div>
   );
@@ -1238,8 +1308,8 @@ function OpportunitiesTab({
   onCreateSuggestion: (s: ProactiveSuggestion) => void;
 }) {
   const { suggestions, expansions } = scoped;
-  const proactive = useProactiveSuggestions(scoped);
-  const hasContent = suggestions.length > 0 || expansions.length > 0 || proactive.length > 0;
+  const expandItems = useExpandSystemItems(scoped);
+  const hasContent = suggestions.length > 0 || expansions.length > 0 || expandItems.length > 0;
 
   if (!hasContent) {
     return <EmptyTab message="No opportunities at this level." />;
@@ -1273,7 +1343,12 @@ function OpportunitiesTab({
         </Section>
       )}
 
-      <ProactiveSuggestions suggestions={proactive} onTakeAction={onCreateSuggestion} />
+      <ExpandSystemSection
+        items={expandItems}
+        onTakeAction={onCreateSuggestion}
+        onApproveIntent={onApproveIntent}
+        onDismissIntent={onDismissIntent}
+      />
     </div>
   );
 }
