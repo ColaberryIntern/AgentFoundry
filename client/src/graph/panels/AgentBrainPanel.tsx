@@ -11,6 +11,7 @@ import {
   closeAgentBrain,
   type ChatMessage,
 } from '../state/graphSlice';
+import { approveIntent, rejectIntent, resolveViolation } from '../../store/orchestratorSlice';
 import type { SPIResult, SPIBreakdown } from '../intelligence/spiEngine';
 import type { OrchestratorIntent, GuardrailViolation } from '../../types/orchestrator';
 import type { AgentVariant } from '../../types/compliance';
@@ -40,9 +41,17 @@ const ALTITUDE_SHORT: Record<string, string> = {
   AGENT: 'Agent',
 };
 
+const TAB_DESCRIPTIONS: Record<BrainTab, string> = {
+  insights: 'Strategic analysis. Review priorities and take the recommended action below.',
+  alerts: 'Items needing attention. Approve, resolve, or dismiss each item.',
+  opportunities: 'Detected opportunities. Approve to execute or dismiss to skip.',
+  askAi: '',
+};
+
 /**
  * Redesigned Agent Intelligence panel with 4 tabs, altitude-scoped content, and chat.
  * Resets on altitude change. Shows smart suggested questions in Ask AI tab.
+ * All cards have action buttons wired to Redux thunks.
  */
 export function AgentBrainPanel() {
   const dispatch = useAppDispatch();
@@ -75,7 +84,7 @@ export function AgentBrainPanel() {
     askAi: chatMessages.length,
   };
 
-  // Submit a question programmatically (used by suggested questions)
+  // Submit a question programmatically (used by suggested questions + action CTAs)
   const submitQuestion = useCallback(
     (question: string) => {
       const userMsg: ChatMessage = {
@@ -101,6 +110,39 @@ export function AgentBrainPanel() {
     },
     [scoped, dispatch],
   );
+
+  // Action callbacks wired to Redux thunks
+  const handleApproveIntent = useCallback(
+    (id: string) => {
+      dispatch(approveIntent({ id }));
+    },
+    [dispatch],
+  );
+
+  const handleDismissIntent = useCallback(
+    (id: string) => {
+      dispatch(rejectIntent({ id, reason: 'Dismissed from Intelligence panel' }));
+    },
+    [dispatch],
+  );
+
+  const handleResolveViolation = useCallback(
+    (id: string) => {
+      dispatch(resolveViolation({ id, reason: 'Resolved from Intelligence panel' }));
+    },
+    [dispatch],
+  );
+
+  const handleRenewVariant = useCallback(
+    (variant: AgentVariant) => {
+      submitQuestion(`Schedule certification renewal for ${variant.name ?? variant.id}`);
+    },
+    [submitQuestion],
+  );
+
+  // Check whether current tab has content to show description
+  const showDescription =
+    activeTab !== 'askAi' && TAB_DESCRIPTIONS[activeTab] && tabCounts[activeTab] > 0;
 
   return (
     <div className="absolute top-0 right-0 bottom-0 w-[380px] z-50 animate-slide-in">
@@ -189,11 +231,36 @@ export function AgentBrainPanel() {
           </div>
         </div>
 
+        {/* Tab description */}
+        {showDescription && (
+          <div className="px-4 py-2 border-b border-white/5 bg-white/[0.02]">
+            <div className="text-[11px] text-[var(--text-muted)] italic">
+              {TAB_DESCRIPTIONS[activeTab]}
+            </div>
+          </div>
+        )}
+
         {/* Tab content — scrollbar hidden */}
         <div className="flex-1 overflow-y-auto scrollbar-none px-4 py-3">
-          {activeTab === 'insights' && <InsightsTab scoped={scoped} />}
-          {activeTab === 'alerts' && <AlertsTab scoped={scoped} />}
-          {activeTab === 'opportunities' && <OpportunitiesTab scoped={scoped} />}
+          {activeTab === 'insights' && (
+            <InsightsTab scoped={scoped} onTakeAction={submitQuestion} />
+          )}
+          {activeTab === 'alerts' && (
+            <AlertsTab
+              scoped={scoped}
+              onApproveIntent={handleApproveIntent}
+              onDismissIntent={handleDismissIntent}
+              onResolveViolation={handleResolveViolation}
+              onRenewVariant={handleRenewVariant}
+            />
+          )}
+          {activeTab === 'opportunities' && (
+            <OpportunitiesTab
+              scoped={scoped}
+              onApproveIntent={handleApproveIntent}
+              onDismissIntent={handleDismissIntent}
+            />
+          )}
           {activeTab === 'askAi' && (
             <AskAITab messages={chatMessages} scoped={scoped} onAskQuestion={submitQuestion} />
           )}
@@ -207,7 +274,7 @@ export function AgentBrainPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Insights Tab — SPI Rankings (altitude-aware)
+// Insights Tab — SPI Rankings (altitude-aware) + KPI Correlation
 // ---------------------------------------------------------------------------
 
 const BREAKDOWN_LABELS: Record<keyof SPIBreakdown, { label: string; color: string }> = {
@@ -219,8 +286,14 @@ const BREAKDOWN_LABELS: Record<keyof SPIBreakdown, { label: string; color: strin
   agentSaturationScore: { label: 'Agent Gap', color: '#06b6d4' },
 };
 
-function InsightsTab({ scoped }: { scoped: ScopedIntelligence }) {
-  const { spiInsights, contextLabel } = scoped;
+function InsightsTab({
+  scoped,
+  onTakeAction,
+}: {
+  scoped: ScopedIntelligence;
+  onTakeAction: (action: string) => void;
+}) {
+  const { spiInsights } = scoped;
 
   if (!spiInsights) {
     return <EmptyTab message="No SPI data available at this level." />;
@@ -228,7 +301,7 @@ function InsightsTab({ scoped }: { scoped: ScopedIntelligence }) {
 
   // Single industry detail
   if (!Array.isArray(spiInsights)) {
-    return <IndustryDetailView result={spiInsights} />;
+    return <IndustryDetailView result={spiInsights} onTakeAction={onTakeAction} />;
   }
 
   // Ranked list
@@ -239,16 +312,22 @@ function InsightsTab({ scoped }: { scoped: ScopedIntelligence }) {
   return (
     <div className="space-y-3">
       <div className="text-xs font-semibold text-[var(--text-primary)]">
-        Strategic Priorities — {contextLabel}
+        Strategic Priorities — {scoped.contextLabel}
       </div>
       {spiInsights.map((result) => (
-        <SPICard key={result.industryCode} result={result} />
+        <SPICard key={result.industryCode} result={result} onTakeAction={onTakeAction} />
       ))}
     </div>
   );
 }
 
-function SPICard({ result }: { result: SPIResult }) {
+function SPICard({
+  result,
+  onTakeAction,
+}: {
+  result: SPIResult;
+  onTakeAction: (action: string) => void;
+}) {
   return (
     <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
       <div className="flex items-center justify-between mb-1">
@@ -275,12 +354,37 @@ function SPICard({ result }: { result: SPIResult }) {
         ))}
       </div>
 
-      <div className="text-[10px] text-[var(--text-muted)] italic">{result.recommendedAction}</div>
+      <button
+        onClick={() => onTakeAction(result.recommendedAction)}
+        className="w-full text-left text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+      >
+        <span className="font-medium">Action:</span>{' '}
+        <span className="italic">{result.recommendedAction}</span>
+      </button>
     </div>
   );
 }
 
-function IndustryDetailView({ result }: { result: SPIResult }) {
+function IndustryDetailView({
+  result,
+  onTakeAction,
+}: {
+  result: SPIResult;
+  onTakeAction: (action: string) => void;
+}) {
+  // Find the dominant SPI sub-score
+  const dominantKey = useMemo(() => {
+    let maxKey: keyof SPIBreakdown = 'coverageGapScore';
+    let maxVal = -1;
+    for (const key of Object.keys(result.breakdown) as (keyof SPIBreakdown)[]) {
+      if (result.breakdown[key] > maxVal) {
+        maxVal = result.breakdown[key];
+        maxKey = key;
+      }
+    }
+    return maxKey;
+  }, [result.breakdown]);
+
   return (
     <div className="space-y-3">
       <div className="text-xs font-semibold text-[var(--text-primary)]">
@@ -297,6 +401,7 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
         </div>
       </div>
 
+      {/* Breakdown bars */}
       <div className="space-y-2">
         {(Object.keys(BREAKDOWN_LABELS) as (keyof SPIBreakdown)[]).map((key) => {
           const { label, color } = BREAKDOWN_LABELS[key];
@@ -324,19 +429,210 @@ function IndustryDetailView({ result }: { result: SPIResult }) {
         })}
       </div>
 
-      <div className="px-3 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-        <div className="text-[11px] font-semibold text-emerald-400 mb-0.5">Recommended Action</div>
-        <div className="text-[11px] text-[var(--text-primary)]">{result.recommendedAction}</div>
+      {/* KPI Correlation Section */}
+      <KPICorrelation result={result} dominantKey={dominantKey} />
+
+      {/* Actionable recommended action */}
+      <button
+        onClick={() => onTakeAction(result.recommendedAction)}
+        className="w-full px-3 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-left group"
+      >
+        <div className="text-[11px] font-semibold text-emerald-400 mb-0.5 flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
+            <path
+              d="M1 6h10M7 2l4 4-4 4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Take Action
+        </div>
+        <div className="text-[11px] text-[var(--text-primary)] group-hover:text-emerald-200 transition-colors">
+          {result.recommendedAction}
+        </div>
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// KPI ↔ SPI Correlation Component
+// ---------------------------------------------------------------------------
+
+const KPI_SPI_MAP: {
+  spiKey: keyof SPIBreakdown;
+  kpiLabel: string;
+  relationship: string;
+}[] = [
+  {
+    spiKey: 'coverageGapScore',
+    kpiLabel: 'Coverage Gap',
+    relationship: 'Same metric — higher SPI score means more uncovered areas',
+  },
+  {
+    spiKey: 'certWeaknessScore',
+    kpiLabel: 'Cert Strength',
+    relationship: 'Inversely related — high weakness = low strength',
+  },
+  {
+    spiKey: 'riskExposureScore',
+    kpiLabel: 'Risk Conc.',
+    relationship: 'Same underlying risk data',
+  },
+  {
+    spiKey: 'revenueProxyScore',
+    kpiLabel: 'Active Agents',
+    relationship: 'Normalized agent density vs. raw count',
+  },
+];
+
+function KPICorrelation({
+  result,
+  dominantKey,
+}: {
+  result: SPIResult;
+  dominantKey: keyof SPIBreakdown;
+}) {
+  // Read live KPI values from the same Redux state used by GlobalMetricsStrip
+  const { variants, intelligence } = useAppSelector((s) => s.registry);
+  const { riskAnalysis } = useAppSelector((s) => s.compliance);
+  const { currentAltitude, altitudeContext } = useAppSelector((s) => s.graph);
+
+  // Compute the KPI values that correspond to SPI sub-scores
+  const kpiValues = useMemo(() => {
+    const scopedVars = altitudeContext.industryCode
+      ? variants.filter((v) => v.industryCode === altitudeContext.industryCode)
+      : variants;
+
+    // Coverage Gap KPI
+    const coverageGap = 0; // Simplified: at industry level this comes from the strip
+
+    // Cert Strength KPI
+    const certCount = scopedVars.filter((v) => v.certificationStatus === 'certified').length;
+    const certStrength =
+      scopedVars.length > 0 ? Math.round((certCount / scopedVars.length) * 100) : 0;
+
+    // Risk Concentration KPI
+    const riskConc =
+      riskAnalysis && riskAnalysis.length > 0
+        ? Math.round(riskAnalysis.reduce((s, r) => s + r.riskScore, 0) / riskAnalysis.length)
+        : 0;
+
+    // Active Agents KPI
+    const activeAgents = scopedVars.filter((v) => v.deployments && v.deployments.length > 0).length;
+
+    // System Health KPI
+    const systemHealth =
+      intelligence && intelligence.length > 0
+        ? Math.round(intelligence.reduce((s, i) => s + (i.score ?? 0), 0) / intelligence.length)
+        : 0;
+
+    return { coverageGap, certStrength, riskConc, activeAgents, systemHealth };
+  }, [variants, riskAnalysis, intelligence, altitudeContext.industryCode, currentAltitude]);
+
+  const kpiValueMap: Record<string, string> = {
+    'Coverage Gap': `${kpiValues.coverageGap}%`,
+    'Cert Strength': `${kpiValues.certStrength}%`,
+    'Risk Conc.': `${kpiValues.riskConc}`,
+    'Active Agents': `${kpiValues.activeAgents}`,
+  };
+
+  const dominantLabel = BREAKDOWN_LABELS[dominantKey]?.label ?? 'Coverage Gap';
+  const dominantScore = Math.round(result.breakdown[dominantKey]);
+
+  return (
+    <div className="px-3 py-2.5 rounded-lg bg-white/[0.02] border border-white/5">
+      <div className="text-[11px] font-semibold text-[var(--text-primary)] mb-2">
+        How This Relates to Your KPIs
+      </div>
+
+      {/* Summary explanation */}
+      <div className="text-[11px] text-[var(--text-muted)] mb-2.5 leading-relaxed">
+        An SPI of <span className="font-bold text-indigo-400">{result.spiScore.toFixed(0)}</span>{' '}
+        means{' '}
+        {result.spiScore >= 70
+          ? 'high strategic priority'
+          : result.spiScore >= 40
+            ? 'moderate strategic priority'
+            : 'lower strategic priority'}
+        . The largest factor is{' '}
+        <span className="font-medium text-[var(--text-primary)]">
+          {dominantLabel} ({dominantScore}/100)
+        </span>
+        .
+      </div>
+
+      {/* SPI ↔ KPI rows */}
+      <div className="space-y-1.5">
+        {KPI_SPI_MAP.map(({ spiKey, kpiLabel }) => {
+          const spiScore = Math.round(result.breakdown[spiKey]);
+          const kpiVal = kpiValueMap[kpiLabel] ?? '—';
+          return (
+            <div key={spiKey} className="flex items-center gap-2 text-[10px]">
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: BREAKDOWN_LABELS[spiKey].color }}
+                />
+                <span className="text-[var(--text-muted)] truncate">
+                  {BREAKDOWN_LABELS[spiKey].label}
+                </span>
+                <span className="font-bold" style={{ color: BREAKDOWN_LABELS[spiKey].color }}>
+                  {spiScore}
+                </span>
+              </div>
+              <svg
+                width="10"
+                height="8"
+                viewBox="0 0 10 8"
+                fill="none"
+                className="flex-shrink-0 text-[var(--text-muted)] opacity-40"
+              >
+                <path
+                  d="M1 4h8M6 1l3 3-3 3"
+                  stroke="currentColor"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className="text-[var(--text-muted)]">{kpiLabel}</span>
+                <span className="font-bold text-[var(--text-primary)]">{kpiVal}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Non-KPI SPI scores */}
+      <div className="mt-2 text-[10px] text-[var(--text-muted)] opacity-70">
+        Volatility ({Math.round(result.breakdown.volatilityScore)}) and Agent Gap (
+        {Math.round(result.breakdown.agentSaturationScore)}) are SPI-only strategic signals.
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Alerts Tab — Risk Alerts + Governance merged
+// Alerts Tab — Risk Alerts + Governance merged, with action buttons
 // ---------------------------------------------------------------------------
 
-function AlertsTab({ scoped }: { scoped: ScopedIntelligence }) {
+function AlertsTab({
+  scoped,
+  onApproveIntent,
+  onDismissIntent,
+  onResolveViolation,
+  onRenewVariant,
+}: {
+  scoped: ScopedIntelligence;
+  onApproveIntent: (id: string) => void;
+  onDismissIntent: (id: string) => void;
+  onResolveViolation: (id: string) => void;
+  onRenewVariant: (variant: AgentVariant) => void;
+}) {
   const { riskAlerts, governance } = scoped;
   const hasContent =
     riskAlerts.length > 0 ||
@@ -352,7 +648,7 @@ function AlertsTab({ scoped }: { scoped: ScopedIntelligence }) {
       {riskAlerts.length > 0 && (
         <Section title={`Risk Alerts (${riskAlerts.length})`}>
           {riskAlerts.map((v) => (
-            <ViolationCard key={v.id} violation={v} />
+            <ViolationCard key={v.id} violation={v} onResolve={onResolveViolation} />
           ))}
         </Section>
       )}
@@ -360,7 +656,12 @@ function AlertsTab({ scoped }: { scoped: ScopedIntelligence }) {
       {governance.intents.length > 0 && (
         <Section title={`Governance Intents (${governance.intents.length})`}>
           {governance.intents.map((intent) => (
-            <IntentCard key={intent.id} intent={intent} />
+            <IntentCard
+              key={intent.id}
+              intent={intent}
+              onApprove={onApproveIntent}
+              onDismiss={onDismissIntent}
+            />
           ))}
         </Section>
       )}
@@ -368,7 +669,7 @@ function AlertsTab({ scoped }: { scoped: ScopedIntelligence }) {
       {governance.expiringVariants.length > 0 && (
         <Section title={`Cert Attention (${governance.expiringVariants.length})`}>
           {governance.expiringVariants.slice(0, 10).map((v) => (
-            <VariantCertCard key={v.id} variant={v} />
+            <VariantCertCard key={v.id} variant={v} onRenew={onRenewVariant} />
           ))}
         </Section>
       )}
@@ -377,10 +678,18 @@ function AlertsTab({ scoped }: { scoped: ScopedIntelligence }) {
 }
 
 // ---------------------------------------------------------------------------
-// Opportunities Tab — Suggestions + Expansion merged
+// Opportunities Tab — Suggestions + Expansion merged, with action buttons
 // ---------------------------------------------------------------------------
 
-function OpportunitiesTab({ scoped }: { scoped: ScopedIntelligence }) {
+function OpportunitiesTab({
+  scoped,
+  onApproveIntent,
+  onDismissIntent,
+}: {
+  scoped: ScopedIntelligence;
+  onApproveIntent: (id: string) => void;
+  onDismissIntent: (id: string) => void;
+}) {
   const { suggestions, expansions } = scoped;
   const hasContent = suggestions.length > 0 || expansions.length > 0;
 
@@ -393,7 +702,12 @@ function OpportunitiesTab({ scoped }: { scoped: ScopedIntelligence }) {
       {suggestions.length > 0 && (
         <Section title={`Suggestions (${suggestions.length})`}>
           {suggestions.map((intent) => (
-            <IntentCard key={intent.id} intent={intent} />
+            <IntentCard
+              key={intent.id}
+              intent={intent}
+              onApprove={onApproveIntent}
+              onDismiss={onDismissIntent}
+            />
           ))}
         </Section>
       )}
@@ -401,7 +715,12 @@ function OpportunitiesTab({ scoped }: { scoped: ScopedIntelligence }) {
       {expansions.length > 0 && (
         <Section title={`Expansion Opportunities (${expansions.length})`}>
           {expansions.map((intent) => (
-            <IntentCard key={intent.id} intent={intent} />
+            <IntentCard
+              key={intent.id}
+              intent={intent}
+              onApprove={onApproveIntent}
+              onDismiss={onDismissIntent}
+            />
           ))}
         </Section>
       )}
@@ -619,7 +938,7 @@ function ChatInput({ scoped }: { scoped: ScopedIntelligence }) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared Cards & Helpers
+// Shared Cards & Helpers (with action buttons)
 // ---------------------------------------------------------------------------
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -631,13 +950,35 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function IntentCard({ intent }: { intent: OrchestratorIntent }) {
+const RESOLVED_STATUSES = new Set(['approved', 'rejected', 'completed', 'cancelled']);
+const ACTIONABLE_STATUSES = new Set(['proposed', 'detected']);
+
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  approved: { bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
+  completed: { bg: 'bg-blue-500/15', text: 'text-blue-400' },
+  rejected: { bg: 'bg-gray-500/15', text: 'text-gray-400' },
+  cancelled: { bg: 'bg-gray-500/15', text: 'text-gray-400' },
+};
+
+function IntentCard({
+  intent,
+  onApprove,
+  onDismiss,
+}: {
+  intent: OrchestratorIntent;
+  onApprove?: (id: string) => void;
+  onDismiss?: (id: string) => void;
+}) {
   const priorityColors: Record<string, string> = {
     critical: '#ef4444',
     high: '#f59e0b',
     medium: '#3b82f6',
     low: '#10b981',
   };
+
+  const isActionable = ACTIONABLE_STATUSES.has(intent.status);
+  const isResolved = RESOLVED_STATUSES.has(intent.status);
+  const statusStyle = STATUS_COLORS[intent.status];
 
   return (
     <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
@@ -662,11 +1003,50 @@ function IntentCard({ intent }: { intent: OrchestratorIntent }) {
         <span>·</span>
         <span className="capitalize">{intent.status}</span>
       </div>
+
+      {/* Action buttons for actionable intents */}
+      {isActionable && (onApprove || onDismiss) && (
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+          {onApprove && (
+            <button
+              onClick={() => onApprove(intent.id)}
+              className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-medium hover:bg-emerald-500/25 transition-colors"
+            >
+              Approve
+            </button>
+          )}
+          {onDismiss && (
+            <button
+              onClick={() => onDismiss(intent.id)}
+              className="px-2.5 py-1 rounded-md bg-white/5 text-[var(--text-muted)] text-[10px] font-medium hover:bg-white/10 transition-colors"
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Resolved status badge */}
+      {isResolved && statusStyle && (
+        <div className="mt-2 pt-2 border-t border-white/5">
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusStyle.bg} ${statusStyle.text}`}
+          >
+            {intent.status}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-function ViolationCard({ violation }: { violation: GuardrailViolation }) {
+function ViolationCard({
+  violation,
+  onResolve,
+}: {
+  violation: GuardrailViolation;
+  onResolve?: (id: string) => void;
+}) {
   return (
     <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
       <div className="flex items-center justify-between mb-1">
@@ -686,23 +1066,51 @@ function ViolationCard({ violation }: { violation: GuardrailViolation }) {
       <div className="text-[11px] text-[var(--text-muted)]">
         {JSON.stringify(violation.violationDetails).slice(0, 80)}
       </div>
+
+      {/* Resolve action */}
+      {onResolve && (
+        <div className="mt-2 pt-2 border-t border-white/5">
+          <button
+            onClick={() => onResolve(violation.id)}
+            className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-medium hover:bg-emerald-500/25 transition-colors"
+          >
+            Resolve
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function VariantCertCard({ variant }: { variant: AgentVariant }) {
+function VariantCertCard({
+  variant,
+  onRenew,
+}: {
+  variant: AgentVariant;
+  onRenew?: (variant: AgentVariant) => void;
+}) {
   return (
     <div className="flex items-center justify-between px-3 py-2 rounded-md bg-white/3">
-      <span className="text-[11px] text-[var(--text-primary)] truncate">
+      <span className="text-[11px] text-[var(--text-primary)] truncate flex-1">
         {variant.name ?? variant.id}
       </span>
-      <span
-        className={`text-[10px] font-bold ${
-          variant.certificationStatus === 'expired' ? 'text-red-400' : 'text-amber-400'
-        }`}
-      >
-        {variant.certificationStatus}
-      </span>
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        <span
+          className={`text-[10px] font-bold ${
+            variant.certificationStatus === 'expired' ? 'text-red-400' : 'text-amber-400'
+          }`}
+        >
+          {variant.certificationStatus}
+        </span>
+        {onRenew && (
+          <button
+            onClick={() => onRenew(variant)}
+            className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 text-[10px] font-medium hover:bg-amber-500/25 transition-colors"
+          >
+            Flag Renewal
+          </button>
+        )}
+      </div>
     </div>
   );
 }
