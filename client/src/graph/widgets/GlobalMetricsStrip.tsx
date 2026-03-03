@@ -59,11 +59,25 @@ function AnimatedMetric({
   onClick,
 }: MetricDef & { onClick: (id: string) => void }) {
   const animatedValue = useAnimatedCount(value);
+  const prevValueRef = useRef(value);
+  const [isPulsing, setIsPulsing] = useState(false);
+
+  useEffect(() => {
+    if (prevValueRef.current !== value && prevValueRef.current !== 0) {
+      setIsPulsing(true);
+      const timer = setTimeout(() => setIsPulsing(false), 600);
+      prevValueRef.current = value;
+      return () => clearTimeout(timer);
+    }
+    prevValueRef.current = value;
+  }, [value]);
 
   return (
     <button
       onClick={() => onClick(id)}
-      className="flex flex-col items-center px-3 py-0.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+      className={`flex flex-col items-center px-3 py-0.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer ${
+        isPulsing ? 'animate-metric-pulse' : ''
+      }`}
     >
       <div className="text-lg font-bold" style={{ color }}>
         {animatedValue}

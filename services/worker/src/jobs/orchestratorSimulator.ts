@@ -141,6 +141,37 @@ async function simulateAddOntologyRelation(
   };
 }
 
+async function simulateCreateUseCase(params: Record<string, unknown>): Promise<SimulationResult> {
+  const industryCode = params.industryCode as string;
+
+  const industry = await queryRows('SELECT code, title FROM naics_industries WHERE code = $1', [
+    industryCode,
+  ]);
+
+  if (industry.length === 0) {
+    return {
+      passed: false,
+      before: {},
+      after: {},
+      risks: [`Industry ${industryCode} does not exist`],
+      violations: ['target_not_found'],
+    };
+  }
+
+  const existing = await queryRows(
+    "SELECT id FROM use_cases WHERE industry_scope::text LIKE $1 AND status = 'active'",
+    [`%${industryCode}%`],
+  );
+
+  return {
+    passed: true,
+    before: { industryCode, existingUseCases: existing.length },
+    after: { industryCode, newUseCaseCount: existing.length + 1 },
+    risks: existing.length > 2 ? ['Industry already has multiple use cases'] : [],
+    violations: [],
+  };
+}
+
 async function simulateGeneric(
   actionType: string,
   params: Record<string, unknown>,
@@ -190,6 +221,9 @@ export async function runOrchestratorSimulator(): Promise<void> {
         typeof row.parameters === 'string' ? JSON.parse(row.parameters) : row.parameters;
 
       switch (row.action_type) {
+        case 'create_use_case':
+          result = await simulateCreateUseCase(params);
+          break;
         case 'create_variant':
           result = await simulateCreateVariant(params);
           break;
