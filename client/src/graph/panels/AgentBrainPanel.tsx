@@ -48,9 +48,12 @@ const TAB_DESCRIPTIONS: Record<BrainTab, string> = {
   askAi: '',
 };
 
+/** Initial number of cert items shown per group before "Show all" */
+const CERT_INITIAL_LIMIT = 5;
+
 /**
  * Redesigned Agent Intelligence panel with 4 tabs, altitude-scoped content, and chat.
- * Resets on altitude change. Shows smart suggested questions in Ask AI tab.
+ * Resets on altitude change. Theme-aware colors via design tokens.
  * All cards have action buttons wired to Redux thunks.
  */
 export function AgentBrainPanel() {
@@ -146,12 +149,11 @@ export function AgentBrainPanel() {
 
   return (
     <div className="absolute top-0 right-0 bottom-0 w-[380px] z-50 animate-slide-in">
-      <div className="h-full bg-[var(--surface-primary)]/95 backdrop-blur-xl border-l border-white/5 shadow-2xl flex flex-col">
+      <div className="h-full bg-[var(--surface-primary)]/95 backdrop-blur-xl border-l border-[var(--border-subtle)] shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-white/5 flex-shrink-0">
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* Mini avatar icon */}
               <div
                 className="w-7 h-7 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: `${altColor}20`, border: `1px solid ${altColor}40` }}
@@ -167,12 +169,9 @@ export function AgentBrainPanel() {
                   />
                 </svg>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Intelligence</h3>
-              </div>
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Intelligence</h3>
             </div>
             <div className="flex items-center gap-2">
-              {/* Altitude context chip */}
               <div
                 className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold"
                 style={{
@@ -186,7 +185,7 @@ export function AgentBrainPanel() {
               </div>
               <button
                 onClick={() => dispatch(closeAgentBrain())}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:bg-white/5 transition-colors"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--surface-card-hover)] transition-colors"
               >
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                   <path
@@ -204,7 +203,7 @@ export function AgentBrainPanel() {
           <div className="text-[11px] text-[var(--text-muted)] mt-1 truncate">
             {scoped.contextLabel}
             {scoped.scopeNote && (
-              <span className="ml-1 text-amber-400/80 italic"> — {scoped.scopeNote}</span>
+              <span className="ml-1 text-amber-500 italic"> — {scoped.scopeNote}</span>
             )}
           </div>
 
@@ -216,13 +215,13 @@ export function AgentBrainPanel() {
                 onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap transition-colors ${
                   activeTab === key
-                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                    : 'text-[var(--text-muted)] hover:bg-white/5 border border-transparent'
+                    ? 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30'
+                    : 'text-[var(--text-muted)] hover:bg-[var(--surface-card-hover)] border border-transparent'
                 }`}
               >
                 {label}
                 {tabCounts[key] > 0 && (
-                  <span className="min-w-[14px] h-3.5 px-1 rounded-full bg-indigo-500/30 text-indigo-300 text-[9px] font-bold flex items-center justify-center">
+                  <span className="min-w-[14px] h-3.5 px-1 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-[9px] font-bold flex items-center justify-center">
                     {tabCounts[key]}
                   </span>
                 )}
@@ -233,8 +232,8 @@ export function AgentBrainPanel() {
 
         {/* Tab description */}
         {showDescription && (
-          <div className="px-4 py-2 border-b border-white/5 bg-white/[0.02]">
-            <div className="text-[11px] text-[var(--text-muted)] italic">
+          <div className="px-4 py-2 border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)]">
+            <div className="text-[11px] text-[var(--text-secondary)] italic">
               {TAB_DESCRIPTIONS[activeTab]}
             </div>
           </div>
@@ -299,12 +298,10 @@ function InsightsTab({
     return <EmptyTab message="No SPI data available at this level." />;
   }
 
-  // Single industry detail
   if (!Array.isArray(spiInsights)) {
     return <IndustryDetailView result={spiInsights} onTakeAction={onTakeAction} />;
   }
 
-  // Ranked list
   if (spiInsights.length === 0) {
     return <EmptyTab message="No industries loaded for SPI analysis." />;
   }
@@ -329,12 +326,14 @@ function SPICard({
   onTakeAction: (action: string) => void;
 }) {
   return (
-    <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
+    <div className="px-3 py-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)]">
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-medium text-[var(--text-primary)] truncate flex-1">
           #{result.rank} {result.title}
         </span>
-        <span className="text-xs font-bold text-indigo-400 ml-2">{result.spiScore.toFixed(0)}</span>
+        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 ml-2">
+          {result.spiScore.toFixed(0)}
+        </span>
       </div>
       <div className="text-[10px] text-[var(--text-muted)] mb-1.5">NAICS {result.industryCode}</div>
 
@@ -356,7 +355,7 @@ function SPICard({
 
       <button
         onClick={() => onTakeAction(result.recommendedAction)}
-        className="w-full text-left text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+        className="w-full text-left text-[10px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer"
       >
         <span className="font-medium">Action:</span>{' '}
         <span className="italic">{result.recommendedAction}</span>
@@ -372,7 +371,6 @@ function IndustryDetailView({
   result: SPIResult;
   onTakeAction: (action: string) => void;
 }) {
-  // Find the dominant SPI sub-score
   const dominantKey = useMemo(() => {
     let maxKey: keyof SPIBreakdown = 'coverageGapScore';
     let maxVal = -1;
@@ -392,7 +390,9 @@ function IndustryDetailView({
       </div>
 
       <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-        <div className="text-[28px] font-bold text-indigo-400">{result.spiScore.toFixed(0)}</div>
+        <div className="text-[28px] font-bold text-indigo-600 dark:text-indigo-400">
+          {result.spiScore.toFixed(0)}
+        </div>
         <div>
           <div className="text-[11px] text-[var(--text-muted)]">Strategic Priority Index</div>
           <div className="text-[11px] text-[var(--text-primary)]">
@@ -414,14 +414,10 @@ function IndustryDetailView({
                   {Math.round(score)}
                 </span>
               </div>
-              <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-[var(--surface-card)] overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-300"
-                  style={{
-                    width: `${score}%`,
-                    backgroundColor: color,
-                    opacity: 0.7,
-                  }}
+                  style={{ width: `${score}%`, backgroundColor: color, opacity: 0.7 }}
                 />
               </div>
             </div>
@@ -437,7 +433,7 @@ function IndustryDetailView({
         onClick={() => onTakeAction(result.recommendedAction)}
         className="w-full px-3 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-left group"
       >
-        <div className="text-[11px] font-semibold text-emerald-400 mb-0.5 flex items-center gap-1.5">
+        <div className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-0.5 flex items-center gap-1.5">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="flex-shrink-0">
             <path
               d="M1 6h10M7 2l4 4-4 4"
@@ -449,7 +445,7 @@ function IndustryDetailView({
           </svg>
           Take Action
         </div>
-        <div className="text-[11px] text-[var(--text-primary)] group-hover:text-emerald-200 transition-colors">
+        <div className="text-[11px] text-[var(--text-primary)] group-hover:text-emerald-700 dark:group-hover:text-emerald-200 transition-colors">
           {result.recommendedAction}
         </div>
       </button>
@@ -495,35 +491,24 @@ function KPICorrelation({
   result: SPIResult;
   dominantKey: keyof SPIBreakdown;
 }) {
-  // Read live KPI values from the same Redux state used by GlobalMetricsStrip
   const { variants, intelligence } = useAppSelector((s) => s.registry);
   const { riskAnalysis } = useAppSelector((s) => s.compliance);
   const { currentAltitude, altitudeContext } = useAppSelector((s) => s.graph);
 
-  // Compute the KPI values that correspond to SPI sub-scores
   const kpiValues = useMemo(() => {
     const scopedVars = altitudeContext.industryCode
       ? variants.filter((v) => v.industryCode === altitudeContext.industryCode)
       : variants;
 
-    // Coverage Gap KPI
-    const coverageGap = 0; // Simplified: at industry level this comes from the strip
-
-    // Cert Strength KPI
+    const coverageGap = 0;
     const certCount = scopedVars.filter((v) => v.certificationStatus === 'certified').length;
     const certStrength =
       scopedVars.length > 0 ? Math.round((certCount / scopedVars.length) * 100) : 0;
-
-    // Risk Concentration KPI
     const riskConc =
       riskAnalysis && riskAnalysis.length > 0
         ? Math.round(riskAnalysis.reduce((s, r) => s + r.riskScore, 0) / riskAnalysis.length)
         : 0;
-
-    // Active Agents KPI
     const activeAgents = scopedVars.filter((v) => v.deployments && v.deployments.length > 0).length;
-
-    // System Health KPI
     const systemHealth =
       intelligence && intelligence.length > 0
         ? Math.round(intelligence.reduce((s, i) => s + (i.score ?? 0), 0) / intelligence.length)
@@ -543,14 +528,16 @@ function KPICorrelation({
   const dominantScore = Math.round(result.breakdown[dominantKey]);
 
   return (
-    <div className="px-3 py-2.5 rounded-lg bg-white/[0.02] border border-white/5">
+    <div className="px-3 py-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)]">
       <div className="text-[11px] font-semibold text-[var(--text-primary)] mb-2">
         How This Relates to Your KPIs
       </div>
 
-      {/* Summary explanation */}
       <div className="text-[11px] text-[var(--text-muted)] mb-2.5 leading-relaxed">
-        An SPI of <span className="font-bold text-indigo-400">{result.spiScore.toFixed(0)}</span>{' '}
+        An SPI of{' '}
+        <span className="font-bold text-indigo-600 dark:text-indigo-400">
+          {result.spiScore.toFixed(0)}
+        </span>{' '}
         means{' '}
         {result.spiScore >= 70
           ? 'high strategic priority'
@@ -564,7 +551,6 @@ function KPICorrelation({
         .
       </div>
 
-      {/* SPI ↔ KPI rows */}
       <div className="space-y-1.5">
         {KPI_SPI_MAP.map(({ spiKey, kpiLabel }) => {
           const spiScore = Math.round(result.breakdown[spiKey]);
@@ -607,7 +593,6 @@ function KPICorrelation({
         })}
       </div>
 
-      {/* Non-KPI SPI scores */}
       <div className="mt-2 text-[10px] text-[var(--text-muted)] opacity-70">
         Volatility ({Math.round(result.breakdown.volatilityScore)}) and Agent Gap (
         {Math.round(result.breakdown.agentSaturationScore)}) are SPI-only strategic signals.
@@ -667,13 +652,95 @@ function AlertsTab({
       )}
 
       {governance.expiringVariants.length > 0 && (
-        <Section title={`Cert Attention (${governance.expiringVariants.length})`}>
-          {governance.expiringVariants.slice(0, 10).map((v) => (
-            <VariantCertCard key={v.id} variant={v} onRenew={onRenewVariant} />
-          ))}
-        </Section>
+        <CertAttentionSection variants={governance.expiringVariants} onRenew={onRenewVariant} />
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cert Attention — Grouped by status, limited with "Show all"
+// ---------------------------------------------------------------------------
+
+function CertAttentionSection({
+  variants,
+  onRenew,
+}: {
+  variants: AgentVariant[];
+  onRenew: (variant: AgentVariant) => void;
+}) {
+  const [showAllExpired, setShowAllExpired] = useState(false);
+  const [showAllPending, setShowAllPending] = useState(false);
+
+  const expired = useMemo(
+    () => variants.filter((v) => v.certificationStatus === 'expired'),
+    [variants],
+  );
+  const pending = useMemo(
+    () => variants.filter((v) => v.certificationStatus !== 'expired'),
+    [variants],
+  );
+
+  const visibleExpired = showAllExpired ? expired : expired.slice(0, CERT_INITIAL_LIMIT);
+  const visiblePending = showAllPending ? pending : pending.slice(0, CERT_INITIAL_LIMIT);
+
+  return (
+    <div>
+      <div className="text-[11px] text-[var(--text-muted)] font-medium mb-1.5">
+        Cert Attention ({variants.length})
+      </div>
+
+      {/* Summary strip */}
+      <div className="flex items-center gap-3 mb-2 px-3 py-1.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)] text-[11px]">
+        {expired.length > 0 && (
+          <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-medium">
+            <span className="w-2 h-2 rounded-full bg-red-500" />
+            {expired.length} expired
+          </span>
+        )}
+        {pending.length > 0 && (
+          <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            {pending.length} pending
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {/* Expired group (shown first — more urgent) */}
+        {visibleExpired.map((v) => (
+          <VariantCertCard key={v.id} variant={v} onRenew={onRenew} />
+        ))}
+        {expired.length > CERT_INITIAL_LIMIT && !showAllExpired && (
+          <ShowMoreButton
+            count={expired.length - CERT_INITIAL_LIMIT}
+            onClick={() => setShowAllExpired(true)}
+          />
+        )}
+
+        {/* Pending group */}
+        {visiblePending.map((v) => (
+          <VariantCertCard key={v.id} variant={v} onRenew={onRenew} />
+        ))}
+        {pending.length > CERT_INITIAL_LIMIT && !showAllPending && (
+          <ShowMoreButton
+            count={pending.length - CERT_INITIAL_LIMIT}
+            onClick={() => setShowAllPending(true)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ShowMoreButton({ count, onClick }: { count: number; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full py-1.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-medium hover:bg-[var(--surface-card-hover)] rounded-md transition-colors"
+    >
+      Show {count} more...
+    </button>
   );
 }
 
@@ -779,7 +846,6 @@ function AskAITab({
   if (messages.length === 0) {
     return (
       <div className="flex flex-col px-1">
-        {/* Header */}
         <div className="flex items-center gap-2.5 mb-4 mt-1">
           <div className="w-10 h-10 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
@@ -803,13 +869,12 @@ function AskAITab({
           </div>
         </div>
 
-        {/* Suggested questions */}
         <div className="space-y-2">
           {suggestedQuestions.map((q) => (
             <button
               key={q}
               onClick={() => onAskQuestion(q)}
-              className="w-full text-left px-3 py-2.5 rounded-lg bg-white/3 border border-white/5 text-xs text-[var(--text-primary)] hover:bg-indigo-500/10 hover:border-indigo-500/20 transition-colors"
+              className="w-full text-left px-3 py-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] hover:bg-indigo-500/10 hover:border-indigo-500/20 transition-colors"
             >
               {q}
             </button>
@@ -825,15 +890,14 @@ function AskAITab({
         <ChatBubble key={msg.id} message={msg} />
       ))}
 
-      {/* Condensed suggestions after messages */}
-      <div className="pt-2 border-t border-white/5">
+      <div className="pt-2 border-t border-[var(--border-subtle)]">
         <div className="text-[10px] text-[var(--text-muted)] mb-1.5">More questions</div>
         <div className="flex flex-wrap gap-1.5">
           {suggestedQuestions.slice(0, 4).map((q) => (
             <button
               key={q}
               onClick={() => onAskQuestion(q)}
-              className="px-2.5 py-1 rounded-full bg-white/3 border border-white/5 text-[10px] text-[var(--text-muted)] hover:bg-indigo-500/10 hover:text-indigo-400 hover:border-indigo-500/20 transition-colors"
+              className="px-2.5 py-1 rounded-full bg-[var(--surface-card)] border border-[var(--border-subtle)] text-[10px] text-[var(--text-muted)] hover:bg-indigo-500/10 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-500/20 transition-colors"
             >
               {q}
             </button>
@@ -851,8 +915,8 @@ function ChatBubble({ message }: { message: ChatMessage }) {
       <div
         className={`max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed ${
           isUser
-            ? 'bg-indigo-500/20 text-indigo-200 border border-indigo-500/20 rounded-br-sm'
-            : 'bg-white/5 text-[var(--text-primary)] border border-white/5 rounded-bl-sm'
+            ? 'bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border border-indigo-500/20 rounded-br-sm'
+            : 'bg-[var(--surface-card)] text-[var(--text-primary)] border border-[var(--border-subtle)] rounded-bl-sm'
         }`}
       >
         <div className="whitespace-pre-wrap break-words">{message.content}</div>
@@ -906,7 +970,7 @@ function ChatInput({ scoped }: { scoped: ScopedIntelligence }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex-shrink-0 px-3 py-2.5 border-t border-white/5 bg-[var(--surface-primary)]/80"
+      className="flex-shrink-0 px-3 py-2.5 border-t border-[var(--border-subtle)] bg-[var(--surface-primary)]/80"
     >
       <div className="flex items-center gap-2">
         <input
@@ -915,12 +979,12 @@ function ChatInput({ scoped }: { scoped: ScopedIntelligence }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={`Ask about ${scoped.contextLabel}...`}
-          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-indigo-500/40 transition-colors"
+          className="flex-1 bg-[var(--surface-card)] border border-[var(--border-subtle)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-indigo-500/40 transition-colors"
         />
         <button
           type="submit"
           disabled={!input.trim()}
-          className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 hover:bg-indigo-500/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path
@@ -938,7 +1002,7 @@ function ChatInput({ scoped }: { scoped: ScopedIntelligence }) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared Cards & Helpers (with action buttons)
+// Shared Cards & Helpers (with action buttons + left-border severity)
 // ---------------------------------------------------------------------------
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -954,10 +1018,17 @@ const RESOLVED_STATUSES = new Set(['approved', 'rejected', 'completed', 'cancell
 const ACTIONABLE_STATUSES = new Set(['proposed', 'detected']);
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  approved: { bg: 'bg-emerald-500/15', text: 'text-emerald-400' },
-  completed: { bg: 'bg-blue-500/15', text: 'text-blue-400' },
-  rejected: { bg: 'bg-gray-500/15', text: 'text-gray-400' },
-  cancelled: { bg: 'bg-gray-500/15', text: 'text-gray-400' },
+  approved: { bg: 'bg-emerald-500/15', text: 'text-emerald-600 dark:text-emerald-400' },
+  completed: { bg: 'bg-blue-500/15', text: 'text-blue-600 dark:text-blue-400' },
+  rejected: { bg: 'bg-gray-500/15', text: 'text-gray-500' },
+  cancelled: { bg: 'bg-gray-500/15', text: 'text-gray-500' },
+};
+
+const PRIORITY_BORDER: Record<string, string> = {
+  critical: 'border-l-2 border-l-red-500',
+  high: 'border-l-2 border-l-amber-500',
+  medium: 'border-l-2 border-l-blue-500',
+  low: 'border-l-2 border-l-emerald-500',
 };
 
 function IntentCard({
@@ -979,9 +1050,12 @@ function IntentCard({
   const isActionable = ACTIONABLE_STATUSES.has(intent.status);
   const isResolved = RESOLVED_STATUSES.has(intent.status);
   const statusStyle = STATUS_COLORS[intent.status];
+  const leftBorder = PRIORITY_BORDER[intent.priority] ?? '';
 
   return (
-    <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
+    <div
+      className={`px-3 py-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)] ${leftBorder}`}
+    >
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-medium text-[var(--text-primary)] truncate flex-1">
           {intent.title}
@@ -1004,13 +1078,12 @@ function IntentCard({
         <span className="capitalize">{intent.status}</span>
       </div>
 
-      {/* Action buttons for actionable intents */}
       {isActionable && (onApprove || onDismiss) && (
-        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--border-subtle)]">
           {onApprove && (
             <button
               onClick={() => onApprove(intent.id)}
-              className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-medium hover:bg-emerald-500/25 transition-colors"
+              className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium hover:bg-emerald-500/25 transition-colors"
             >
               Approve
             </button>
@@ -1018,7 +1091,7 @@ function IntentCard({
           {onDismiss && (
             <button
               onClick={() => onDismiss(intent.id)}
-              className="px-2.5 py-1 rounded-md bg-white/5 text-[var(--text-muted)] text-[10px] font-medium hover:bg-white/10 transition-colors"
+              className="px-2.5 py-1 rounded-md bg-[var(--surface-card-hover)] text-[var(--text-muted)] text-[10px] font-medium hover:bg-[var(--surface-tertiary)] transition-colors"
             >
               Dismiss
             </button>
@@ -1026,9 +1099,8 @@ function IntentCard({
         </div>
       )}
 
-      {/* Resolved status badge */}
       {isResolved && statusStyle && (
-        <div className="mt-2 pt-2 border-t border-white/5">
+        <div className="mt-2 pt-2 border-t border-[var(--border-subtle)]">
           <span
             className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusStyle.bg} ${statusStyle.text}`}
           >
@@ -1047,17 +1119,22 @@ function ViolationCard({
   violation: GuardrailViolation;
   onResolve?: (id: string) => void;
 }) {
+  const isBlock = violation.severity === 'block';
   return (
-    <div className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/5">
+    <div
+      className={`px-3 py-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)] ${
+        isBlock ? 'border-l-2 border-l-red-500' : 'border-l-2 border-l-amber-500'
+      }`}
+    >
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-medium text-[var(--text-primary)] capitalize">
           {violation.guardrailType.replace(/_/g, ' ')}
         </span>
         <span
           className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-            violation.severity === 'block'
-              ? 'bg-red-500/20 text-red-400'
-              : 'bg-amber-500/20 text-amber-400'
+            isBlock
+              ? 'bg-red-500/20 text-red-600 dark:text-red-400'
+              : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
           }`}
         >
           {violation.severity}
@@ -1067,12 +1144,11 @@ function ViolationCard({
         {JSON.stringify(violation.violationDetails).slice(0, 80)}
       </div>
 
-      {/* Resolve action */}
       {onResolve && (
-        <div className="mt-2 pt-2 border-t border-white/5">
+        <div className="mt-2 pt-2 border-t border-[var(--border-subtle)]">
           <button
             onClick={() => onResolve(violation.id)}
-            className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-400 text-[10px] font-medium hover:bg-emerald-500/25 transition-colors"
+            className="px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium hover:bg-emerald-500/25 transition-colors"
           >
             Resolve
           </button>
@@ -1089,23 +1165,41 @@ function VariantCertCard({
   variant: AgentVariant;
   onRenew?: (variant: AgentVariant) => void;
 }) {
+  const isExpired = variant.certificationStatus === 'expired';
   return (
-    <div className="flex items-center justify-between px-3 py-2 rounded-md bg-white/3">
-      <span className="text-[11px] text-[var(--text-primary)] truncate flex-1">
+    <div
+      className={`px-3 py-2.5 rounded-lg bg-[var(--surface-card)] border border-[var(--border-subtle)] ${
+        isExpired ? 'border-l-2 border-l-red-500' : 'border-l-2 border-l-amber-500'
+      }`}
+    >
+      {/* Line 1: Full name */}
+      <div className="text-xs font-medium text-[var(--text-primary)] mb-1 leading-snug">
         {variant.name ?? variant.id}
-      </span>
-      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        <span
-          className={`text-[10px] font-bold ${
-            variant.certificationStatus === 'expired' ? 'text-red-400' : 'text-amber-400'
-          }`}
-        >
-          {variant.certificationStatus}
+      </div>
+      {/* Line 2: Status dot + label + action button */}
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5 text-[11px] font-medium">
+          <span
+            className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              isExpired ? 'bg-red-500' : 'bg-amber-500'
+            }`}
+          />
+          <span
+            className={
+              isExpired ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'
+            }
+          >
+            {variant.certificationStatus}
+          </span>
         </span>
         {onRenew && (
           <button
             onClick={() => onRenew(variant)}
-            className="px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-400 text-[10px] font-medium hover:bg-amber-500/25 transition-colors"
+            className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
+              isExpired
+                ? 'bg-red-500/15 text-red-600 dark:text-red-400 hover:bg-red-500/25'
+                : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25'
+            }`}
           >
             Flag Renewal
           </button>

@@ -40,6 +40,11 @@
   --glass-blur: 12px;
   --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
 
+  /* Card surfaces */
+  --surface-card: #f8fafc;
+  --surface-card-hover: #f1f5f9;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+
   /* Metric ring */
   --ring-size: 80px;
   --ring-stroke: 6px;
@@ -71,6 +76,11 @@
 
   /* Glass effect */
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+  /* Card surfaces */
+  --surface-card: rgba(255, 255, 255, 0.03);
+  --surface-card-hover: rgba(255, 255, 255, 0.06);
+  --border-subtle: rgba(255, 255, 255, 0.06);
 
   /* Metric ring */
   --ring-bg: #1e293b;
